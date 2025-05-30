@@ -25,3 +25,8 @@ generate-contract:
 
 simulate-verification-call:
 	@snarkjs zkey export soliditycalldata zk/proofs/public.json zk/proofs/proof.json
+
+######################################################################################
+
+deploy-all:
+	@forge script script/DeployAll.s.sol:DeployAll --rpc-url ${SEPOLIA_RPC_URL} --account burner --sender 0xFB6a372F2F51a002b390D18693075157A459641F --broadcast --verify --verifier blockscout --verifier-url https://eth-sepolia.blockscout.com/api/ -vvvv
