@@ -19,3 +19,9 @@ generate-proof:
 
 verify-proof:
 	@snarkjs groth16 verify zk/outputs/verification_key.json zk/proofs/public.json zk/proofs/proof.json
+
+generate-contract:
+	@snarkjs zkey export solidityverifier zk/outputs/pinVerification.zkey src/verifier.sol
+
+simulate-verification-call:
+	@snarkjs zkey export soliditycalldata zk/proofs/public.json zk/proofs/proof.json
