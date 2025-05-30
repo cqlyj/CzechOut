@@ -7,3 +7,15 @@ setup-key:
 generate-key:
 	@snarkjs groth16 setup zk/outputs/pinVerification.r1cs zk/outputs/pot12.ptau zk/outputs/pinVerification.zkey && \
 	snarkjs zkey export verificationkey zk/outputs/pinVerification.zkey zk/outputs/verification_key.json
+
+generate-input:
+	@node zk/inputs/generateInput.js
+
+generate-witness:
+	@node zk/outputs/pinVerification_js/generate_witness.js zk/outputs/pinVerification_js/pinVerification.wasm zk/inputs/input.json zk/outputs/witness.wtns
+
+generate-proof:
+	@snarkjs groth16 prove zk/outputs/pinVerification.zkey zk/outputs/witness.wtns zk/proofs/proof.json zk/proofs/public.json
+
+verify-proof:
+	@snarkjs groth16 verify zk/outputs/verification_key.json zk/proofs/public.json zk/proofs/proof.json
