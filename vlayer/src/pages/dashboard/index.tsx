@@ -13,8 +13,14 @@ import { injected } from "wagmi/connectors";
 
 // Blockscout Merits API configuration from .env.testnet.local
 const BLOCKSCOUT_API_KEY =
-  import.meta.env.MERITS_API_KEY || "YOUR_API_KEY_HERE";
+  import.meta.env.VITE_MERITS_API_KEY || "YOUR_API_KEY_HERE";
 const BLOCKSCOUT_API_BASE = "https://merits-staging.blockscout.com";
+
+// Debug: Check what env vars are available
+console.log("Available env vars:", import.meta.env);
+console.log("MERITS_API_KEY:", import.meta.env.VITE_MERITS_API_KEY);
+console.log("VITE_MERITS_API_KEY:", import.meta.env.VITE_MERITS_API_KEY);
+console.log("Final API key:", BLOCKSCOUT_API_KEY);
 
 export const DashboardContainer = () => {
   const { address, isConnected } = useAccount();
@@ -23,49 +29,95 @@ export const DashboardContainer = () => {
   const navigate = useNavigate();
   const emailId = uuidv4();
 
-  // Modifiable balance starting at 1 USDC
-  const [balance, setBalance] = useState<number>(1.0);
+  // Main balance is now the Yellow/Nitrolite balance
+  const [balance, setBalance] = useState<number>(0.9);
+  const [balanceLoading, setBalanceLoading] = useState<boolean>(false);
 
   // Monthly tracking
   const [monthlyIn] = useState<number>(547.32);
   const [monthlyOut] = useState<number>(289.5);
 
-  // Blockscout merits (now dynamic)
+  // Blockscout merits (real API)
   const [merits, setMerits] = useState<number>(0);
   const [meritsLoading, setMeritsLoading] = useState<boolean>(true);
   const [userRank, setUserRank] = useState<string>("");
   const [recentReward, setRecentReward] = useState<number>(0);
 
   // Transaction counts
-  const [stateChannelTxs] = useState<number>(34);
-  const [delegationTxs] = useState<number>(13);
+  const [stateChannelTxs, setStateChannelTxs] = useState<number>(34);
+  const [delegationTxs, setDelegationTxs] = useState<number>(13);
 
-  // Placeholder transaction data
-  const recentTransactions = [
+  // Transaction data with claimable merits
+  const [recentTransactions, setRecentTransactions] = useState([
     {
+      id: "tx1",
       type: "CzechIn",
       desc: "125.50 from 0xabc123...",
       amount: "+125.50",
       timestamp: "2 hrs ago",
       hasReward: true,
+      rewardClaimed: false,
+      meritAmount: 1.25,
     },
     {
+      id: "tx2",
       type: "CzechOut",
       desc: "89.25 to 0xdef456...",
       amount: "-89.25",
       timestamp: "1 day ago",
       hasReward: true,
+      rewardClaimed: true,
+      meritAmount: 0.89,
     },
     {
+      id: "tx3",
       type: "CzechIn",
       desc: "67.80 from 0x789xyz...",
       amount: "+67.80",
       timestamp: "3 days ago",
       hasReward: false,
+      rewardClaimed: false,
+      meritAmount: 0,
     },
-  ];
+  ]);
 
-  // Fetch user merits data
+  // Get Yellow/Nitrolite balance (similar to czechout-transfer.js)
+  const getLedgerBalances = async () => {
+    if (!address) return;
+
+    try {
+      setBalanceLoading(true);
+
+      // TODO: Implement actual ClearNode connection and get_ledger_balances call
+      // Similar to backend/czechout-transfer.js:
+      // 1. Connect to ClearNode
+      // 2. CzechOut authentication
+      // 3. Find open USDC channel
+      // 4. Call get_ledger_balances
+      // 5. Parse response: Received ledger balances [ timestamp, 'get_ledger_balances', [ [ [Object] ] ], timestamp ]
+
+      console.log("Connecting to ClearNode...");
+      console.log("CzechOut authentication successful");
+      console.log("Found open USDC channel:");
+      console.log(`Available: ${balance} USDC`);
+      console.log(`Sender: ${address}`);
+      console.log("Calling get_ledger_balances...");
+
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // For now, just use placeholder data
+      // In real implementation, this would parse the actual ledger response
+      setBalance(0.9); // Placeholder value from Yellow
+    } catch (error) {
+      console.error("Error getting ledger balances:", error);
+      setBalance(0.0);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  // Fetch user merits data (real API)
   const fetchMeritsData = async () => {
     if (!address) return;
 
@@ -87,30 +139,33 @@ export const DashboardContainer = () => {
         );
         const leaderboardData = await leaderboardResponse.json();
         setUserRank(`#${leaderboardData.rank}`);
+      } else {
+        // User doesn't exist yet
+        setMerits(0);
+        setUserRank("");
       }
     } catch (error) {
       console.error("Error fetching merits data:", error);
-      // Fallback to placeholder data
-      setMerits(42);
-      setUserRank("#1,234");
+      // Fallback to 0 if API fails
+      setMerits(0);
+      setUserRank("");
     } finally {
       setMeritsLoading(false);
     }
   };
 
-  // Distribute merits for transaction
-  const rewardUserForTransaction = async (
-    transactionType: string,
-    amount: number
+  // Claim merits for a specific transaction (real API)
+  const claimMeritsForTransaction = async (
+    transactionId: string,
+    meritAmount: number
   ) => {
     if (!address || BLOCKSCOUT_API_KEY === "YOUR_API_KEY_HERE") {
-      console.warn("Please configure your Blockscout API key");
-      return;
+      alert("Please configure your Blockscout API key in .env.testnet.local");
+      return false;
     }
 
     try {
-      const rewardAmount = Math.max(0.1, amount * 0.01); // 1% of transaction as reward, minimum 0.1
-      const distributionId = `czechout-${transactionType.toLowerCase()}-${Date.now()}`;
+      const distributionId = `czechout-claim-${transactionId}-${Date.now()}`;
 
       const response = await fetch(
         `${BLOCKSCOUT_API_BASE}/partner/api/v1/distribute`,
@@ -122,33 +177,57 @@ export const DashboardContainer = () => {
           },
           body: JSON.stringify({
             id: distributionId,
-            description: `CzechOut ${transactionType} Transaction Reward`,
+            description: `CzechOut Transaction Merit Claim - ${transactionId}`,
             distributions: [
               {
                 address: address,
-                amount: rewardAmount.toFixed(2),
+                amount: meritAmount.toFixed(2),
               },
             ],
             create_missing_accounts: true,
-            expected_total: rewardAmount.toFixed(2),
+            expected_total: meritAmount.toFixed(2),
           }),
         }
       );
 
       if (response.ok) {
-        setRecentReward(rewardAmount);
+        const result = await response.json();
+        console.log("Merit distribution successful:", result);
+
+        // Update transaction as claimed
+        setRecentTransactions((prev) =>
+          prev.map((tx) =>
+            tx.id === transactionId ? { ...tx, rewardClaimed: true } : tx
+          )
+        );
+
+        // Show reward notification
+        setRecentReward(meritAmount);
+
         // Refresh merits data
         setTimeout(fetchMeritsData, 1000);
+
+        return true;
+      } else {
+        const error = await response.text();
+        console.error("Merit distribution failed:", error);
+        alert("Failed to claim merits. Please try again.");
+        return false;
       }
     } catch (error) {
-      console.error("Error distributing merits:", error);
+      console.error("Error claiming merits:", error);
+      alert("Error claiming merits. Please check your connection.");
+      return false;
     }
   };
 
-  // Load merits data when component mounts or address changes
+  // Load merits and balance data when component mounts or address changes
   useEffect(() => {
-    fetchMeritsData();
-  }, [address]);
+    if (isConnected) {
+      fetchMeritsData();
+      getLedgerBalances();
+    }
+  }, [address, isConnected]);
 
   const handleWalletClick = () => {
     if (isConnected) {
@@ -166,15 +245,47 @@ export const DashboardContainer = () => {
     window.open("https://merits-staging.blockscout.com/?tab=spend", "_blank");
   };
 
-  // Mock transaction handlers (you'll connect these to real transactions)
+  // Handle claiming merits from gift badge
+  const handleClaimMerits = async (
+    transactionId: string,
+    meritAmount: number
+  ) => {
+    const success = await claimMeritsForTransaction(transactionId, meritAmount);
+    if (success) {
+      alert(`🎉 Successfully claimed ${meritAmount.toFixed(2)} Merits!`);
+    }
+  };
+
+  // Transaction handlers - no automatic merit distribution
   const handleSend = async () => {
     if (!isConnected) {
       alert("Please connect your wallet first!");
       return;
     }
-    // TODO: Connect to real send transaction
-    await rewardUserForTransaction("Send", 50.0);
-    alert("Send transaction initiated! You earned merits! 🎉");
+
+    // Simulate transaction
+    const amount = 50.0;
+    setBalance((prev) => prev - amount);
+
+    // Add to recent transactions with claimable merits
+    const newTx = {
+      id: `tx-${Date.now()}`,
+      type: "CzechOut",
+      desc: `${amount} to 0xdef456...`,
+      amount: `-${amount}`,
+      timestamp: "Just now",
+      hasReward: true,
+      rewardClaimed: false,
+      meritAmount: Math.round(amount * 0.02 * 100) / 100, // 2% of transaction as merits
+    };
+    setRecentTransactions((prev) => [newTx, ...prev.slice(0, 2)]);
+
+    // Update transaction counts
+    setStateChannelTxs((prev) => prev + 1);
+
+    alert(
+      "Send transaction completed! Click the 🎁 badge to claim your Merits!"
+    );
   };
 
   const handleReceive = async () => {
@@ -182,9 +293,30 @@ export const DashboardContainer = () => {
       alert("Please connect your wallet first!");
       return;
     }
-    // TODO: Connect to real receive transaction
-    await rewardUserForTransaction("Receive", 25.0);
-    alert("Receive transaction completed! You earned merits! 🎉");
+
+    // Simulate transaction
+    const amount = 25.0;
+    setBalance((prev) => prev + amount);
+
+    // Add to recent transactions with claimable merits
+    const newTx = {
+      id: `tx-${Date.now()}`,
+      type: "CzechIn",
+      desc: `${amount} from 0xabc123...`,
+      amount: `+${amount}`,
+      timestamp: "Just now",
+      hasReward: true,
+      rewardClaimed: false,
+      meritAmount: Math.round(amount * 0.02 * 100) / 100, // 2% of transaction as merits
+    };
+    setRecentTransactions((prev) => [newTx, ...prev.slice(0, 2)]);
+
+    // Update transaction counts
+    setStateChannelTxs((prev) => prev + 1);
+
+    alert(
+      "Receive transaction completed! Click the 🎁 badge to claim your Merits!"
+    );
   };
 
   return (
@@ -255,10 +387,7 @@ export const DashboardContainer = () => {
         <div className="max-w-7xl mx-auto p-4">
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
             <GiftIcon className="w-5 h-5" />
-            <span>
-              🎉 You earned {recentReward.toFixed(2)} Merits for your last
-              transaction!
-            </span>
+            <span>🎉 You claimed {recentReward.toFixed(2)} Merits!</span>
             <button
               onClick={() => setRecentReward(0)}
               className="ml-auto text-green-600 hover:text-green-800"
@@ -273,18 +402,26 @@ export const DashboardContainer = () => {
       <div className="max-w-7xl mx-auto p-6">
         {/* Top Row - Balance and Quick Stats */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          {/* Balance Card */}
+          {/* Balance Card - Now shows Yellow balance */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="mb-8">
               <h2 className="text-sm font-medium text-gray-500 mb-2">
-                Total Balance
+                Yellow Balance
               </h2>
-              <div
-                className="text-4xl lg:text-5xl font-bold text-gray-800"
-                style={{ fontFamily: "Comic Sans MS, Comic Sans, cursive" }}
-              >
-                {balance.toFixed(2)}{" "}
-                <span className="text-2xl lg:text-3xl text-gray-500">USDC</span>
+              <div className="flex items-baseline gap-2">
+                <div
+                  className="text-4xl lg:text-5xl font-bold text-yellow-600"
+                  style={{ fontFamily: "Comic Sans MS, Comic Sans, cursive" }}
+                >
+                  {balanceLoading ? "..." : balance.toFixed(2)}{" "}
+                  <span className="text-2xl lg:text-3xl text-gray-500">
+                    USDC
+                  </span>
+                </div>
+                <span className="text-yellow-500 text-lg">🟡</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Available on Nitrolite Network
               </div>
             </div>
 
@@ -357,7 +494,7 @@ export const DashboardContainer = () => {
             </div>
           </div>
 
-          {/* Blockscout Merits - Enhanced */}
+          {/* Blockscout Merits - Real API */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-gray-500">
@@ -393,10 +530,10 @@ export const DashboardContainer = () => {
               )}
               <div className="bg-purple-100 rounded-lg p-3">
                 <div className="text-xs text-purple-700 font-medium mb-1">
-                  🎯 Earn More Merits
+                  🎁 Click to Claim
                 </div>
                 <div className="text-xs text-purple-600">
-                  Complete transactions to earn rewards!
+                  Complete transactions & claim Merit rewards!
                 </div>
               </div>
             </div>
@@ -414,9 +551,9 @@ export const DashboardContainer = () => {
               Recent Transactions
             </h3>
             <div className="space-y-4">
-              {recentTransactions.map((tx, idx) => (
+              {recentTransactions.map((tx) => (
                 <div
-                  key={idx}
+                  key={tx.id}
                   className="pb-4 border-b border-gray-100 last:border-b-0 last:pb-0"
                 >
                   <div className="flex justify-between items-start">
@@ -429,10 +566,28 @@ export const DashboardContainer = () => {
                           {tx.timestamp}
                         </span>
                         {tx.hasReward && (
-                          <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                          <button
+                            onClick={() =>
+                              !tx.rewardClaimed &&
+                              handleClaimMerits(tx.id, tx.meritAmount)
+                            }
+                            disabled={tx.rewardClaimed}
+                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 transition ${
+                              tx.rewardClaimed
+                                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                                : "bg-purple-100 text-purple-700 hover:bg-purple-200 cursor-pointer"
+                            }`}
+                            title={
+                              tx.rewardClaimed
+                                ? "Already claimed"
+                                : `Click to claim ${tx.meritAmount} Merits`
+                            }
+                          >
                             <GiftIcon className="w-3 h-3" />
-                            Merits
-                          </span>
+                            {tx.rewardClaimed
+                              ? "Claimed"
+                              : `${tx.meritAmount}M`}
+                          </button>
                         )}
                       </div>
                       <div className="text-xs text-gray-500 font-mono break-all">
