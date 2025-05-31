@@ -326,7 +326,7 @@ export const RegisterContainer = () => {
 
       setCurrentStep("completed");
       setTimeout(() => {
-        navigate("/update7702");
+        navigate("/account-setup");
       }, 2000);
     }
   };
