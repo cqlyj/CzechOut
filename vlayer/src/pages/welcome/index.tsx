@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { getStepPath } from "../../app/router/steps";
 import { StepKind } from "../../app/router/types";
 import { useConnectWallet } from "./useConnectWallet";
@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 export const WelcomePage = () => {
   const { connectWallet } = useConnectWallet();
   const { address, isConnected } = useAccount();
+  const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export const WelcomePage = () => {
   };
 
   const handleContinue = () => {
-    window.location.href = "http://localhost:3000";
+    navigate("/app/register");
   };
 
   const features = [
