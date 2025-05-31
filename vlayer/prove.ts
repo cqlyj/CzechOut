@@ -27,12 +27,15 @@ if (!john) {
   );
 }
 
-const { prover, verifier } = await deployVlayerContracts({
-  proverSpec,
-  verifierSpec,
-  proverArgs: [],
-  verifierArgs: [],
-});
+// const { prover, verifier } = await deployVlayerContracts({
+//   proverSpec,
+//   verifierSpec,
+//   proverArgs: [],
+//   verifierArgs: [],
+// });
+
+const prover = "0x17910b3118F1Bd104E75B0CF1019EB5541e8eAfA";
+const verifier = "0x132f49d0fEBE751328389A2ffe0d804b5bafbA76";
 
 if (!dnsServiceUrl) {
   throw new Error("DNS service URL is not set");
