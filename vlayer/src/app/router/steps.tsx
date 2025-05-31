@@ -20,7 +20,7 @@ export const stepComponents: StepComponentMap = {
   [StepKind.welcome]: WelcomePage,
   [StepKind.register]: RegisterContainer,
   [StepKind.dashboard]: DashboardContainer,
-  [StepKind.update7702]: Update7702Page,  
+  [StepKind.accountSetup]: Update7702Page,  
   [StepKind.success]: SuccessContainer,
 };
 
