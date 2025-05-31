@@ -4,3 +4,4 @@ export * from "./sendEmail";
 export * from "./mintNFT";
 export * from "./collectEmail";
 export * from "./success";
+export * from "./register";

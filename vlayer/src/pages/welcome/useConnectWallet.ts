@@ -10,11 +10,11 @@ export const useConnectWallet = () => {
   const { disconnect } = useDisconnect();
   const navigate = useNavigate();
 
-  // useEffect(() => {
-  //   if (address) {
-  //     navigate(`/${getStepPath(StepKind.register)}`);
-  //   }
-  // }, [address, navigate]);
+//   useEffect(() => {
+//     if (address) {
+//       navigate(`/${getStepPath(StepKind.register)}`);
+//     }
+//   }, [address, navigate]);
 
   const connectWallet = () => {
     connect({

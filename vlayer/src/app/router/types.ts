@@ -5,6 +5,7 @@ export enum StepKind {
   collectEmail,
   mintNft,
   success,
+  register,
 }
 
 export type StepMeta = {
@@ -21,9 +22,9 @@ export const stepsMeta: Record<StepKind, StepMeta> = {
   [StepKind.welcome]: {
     path: "",
     kind: StepKind.welcome,
-    title: "Domain NFT",
+    title: "Czech Out",
     description:
-      'Mint an NFT with your email domain. For example, if you work at Ethereum Foundation, you can mint "ethereum.org" NFT. This showcases Email Proofs.',
+      'No wait and just chezhout',
     headerIcon: "/img/email-welcome-img.svg",
     index: 0,
   },
@@ -69,5 +70,12 @@ export const stepsMeta: Record<StepKind, StepMeta> = {
     description: "",
     headerIcon: "/img/success-icon.svg",
     index: 4,
+  },
+  [StepKind.register]: {
+    path: "register",
+    kind: StepKind.register,
+    title: "Register",
+    description: "",
+    index: 5,
   },
 };
