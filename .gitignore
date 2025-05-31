@@ -17,3 +17,6 @@ docs/
 node_modules/human-login/public/models/
 human-login/.next/
 human-login/node_modules/
+backend/api/node_modules/
+backend/node_modules/
+node_modules/
