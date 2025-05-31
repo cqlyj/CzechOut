@@ -1,7 +1,7 @@
 export enum StepKind {
   welcome,
   register,
-  update7702,
+  accountSetup,
   dashboard,
   success,
 }
@@ -21,7 +21,7 @@ export const stepsMeta: Record<StepKind, StepMeta> = {
     path: "",
     kind: StepKind.welcome,
     title: "Czech Out",
-    description: 'No wait and just chezhout',
+    description: "No wait and just chezhout",
     index: 0,
   },
   [StepKind.register]: {
@@ -32,18 +32,20 @@ export const stepsMeta: Record<StepKind, StepMeta> = {
     index: 1,
     backUrl: "",
   },
-  [StepKind.update7702]: {
-    path: "update7702",
-    kind: StepKind.update7702,
-    title: "Upgrade 7702",
-    description: "",
+  [StepKind.accountSetup]: {
+    path: "account-setup",
+    kind: StepKind.accountSetup,
+    title: "Secure Your Account",
+    description:
+      "Register credentials on-chain and setup EIP-7702 delegation for secure face + PIN transactions",
     index: 2,
   },
   [StepKind.success]: {
     path: "success",
     kind: StepKind.success,
     title: "Success 🎉",
-    description: "Your account is now a 7702 smart account<br />Try sending transactions with face recognition and pin",
+    description:
+      "Your account is now a 7702 smart account<br />Try sending transactions with face recognition and pin",
     index: 3,
   },
   [StepKind.dashboard]: {
