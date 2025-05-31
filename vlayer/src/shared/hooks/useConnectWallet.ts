@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { injected, useAccount, useConnect, useDisconnect } from "wagmi";
 import { useNavigate } from "react-router";
-import { getStepPath } from "../../app/router/steps";
-import { StepKind } from "../../app/router/types";
 
 export const useConnectWallet = () => {
   const { connect } = useConnect();
@@ -10,11 +8,11 @@ export const useConnectWallet = () => {
   const { disconnect } = useDisconnect();
   const navigate = useNavigate();
 
-  // useEffect(() => {
-  //   if (address) {
-  //     navigate(`/${getStepPath(StepKind.register)}`);
-  //   }
-  // }, [address, navigate]);
+//   useEffect(() => {
+//     if (address) {
+//       void navigate("/send-email");
+//     }
+//   }, [address, navigate]);
 
   const connectWallet = () => {
     connect({

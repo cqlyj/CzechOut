@@ -12,7 +12,7 @@ import {
 } from "@vlayer/react";
 import { preverifyEmail } from "@vlayer/sdk";
 import proverSpec from "../../../../out/EmailDomainProver.sol/EmailDomainProver";
-import verifierSpec from "../../../../out/EmailProofVerifier.sol/EmailDomainVerifier";
+import verifierSpec from "../../../../out/EmailDomainVerifier.sol/EmailDomainVerifier";
 import { AbiStateMutability, ContractFunctionArgs } from "viem";
 import { useNavigate } from "react-router";
 import debug from "debug";

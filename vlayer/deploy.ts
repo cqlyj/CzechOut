@@ -1,5 +1,5 @@
 import proverSpec from "../out/EmailDomainProver.sol/EmailDomainProver";
-import verifierSpec from "../out/EmailProofVerifier.sol/EmailDomainVerifier";
+import verifierSpec from "../out/EmailDomainVerifier.sol/EmailDomainVerifier";
 
 import {
   deployVlayerContracts,
