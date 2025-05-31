@@ -12,6 +12,9 @@ import {
   HomeIcon,
 } from "@heroicons/react/24/outline";
 
+// Blockscout URL for Sepolia
+const BLOCKSCOUT_BASE_URL = "https://eth-sepolia.blockscout.com";
+
 export const SuccessContainer = () => {
   const [searchParams] = useSearchParams();
   const { address } = useAccount();
@@ -129,12 +132,12 @@ export const SuccessContainer = () => {
                     {address}
                   </div>
                   <a
-                    href={`${sepolia.blockExplorers.default.url}/address/${address}`}
+                    href={`${BLOCKSCOUT_BASE_URL}/address/${address}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center space-x-2 mt-3 text-blue-600 hover:text-blue-800 font-medium transition-colors"
                   >
-                    <span>View on Sepolia Explorer</span>
+                    <span>View on Blockscout</span>
                     <ArrowTopRightOnSquareIcon className="w-5 h-5" />
                   </a>
                 </div>
@@ -166,7 +169,7 @@ export const SuccessContainer = () => {
                       {truncateHash(credentialsHash)}
                     </div>
                     <a
-                      href={`${sepolia.blockExplorers.default.url}/tx/${credentialsHash}`}
+                      href={`${BLOCKSCOUT_BASE_URL}/tx/${credentialsHash}`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center space-x-2 text-green-600 hover:text-green-800 font-medium transition-colors"
@@ -194,7 +197,7 @@ export const SuccessContainer = () => {
                       {truncateHash(delegationHash)}
                     </div>
                     <a
-                      href={`${sepolia.blockExplorers.default.url}/tx/${delegationHash}`}
+                      href={`${BLOCKSCOUT_BASE_URL}/tx/${delegationHash}`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center space-x-2 text-purple-600 hover:text-purple-800 font-medium transition-colors"

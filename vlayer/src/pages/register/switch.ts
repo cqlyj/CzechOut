@@ -23,7 +23,7 @@ export async function switchToSepolia() {
               symbol: "ETH",
               decimals: 18,
             },
-            blockExplorerUrls: ["https://sepolia.etherscan.io"],
+            blockExplorerUrls: ["https://eth-sepolia.blockscout.com"],
           },
         ],
       });
