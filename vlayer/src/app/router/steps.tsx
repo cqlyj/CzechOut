@@ -6,6 +6,7 @@ import {
   MintNFTContainer,
   SuccessContainer,
   RegisterContainer,
+  Update7702Page,
 } from "../../pages";
 import React from "react";
 import { StepKind, stepsMeta, StepMeta } from "./types";
@@ -17,13 +18,10 @@ export type StepComponentMap = Record<StepKind, React.ComponentType>;
 // Map step kinds to their respective components
 export const stepComponents: StepComponentMap = {
   [StepKind.welcome]: WelcomePage,
-  [StepKind.connectWallet]: ConnectWallet,
-  [StepKind.sendEmail]: SendEmailContainer,
-  [StepKind.collectEmail]: CollectEmailContainer,
-  [StepKind.mintNft]: MintNFTContainer,
-  [StepKind.success]: SuccessContainer,
   [StepKind.register]: RegisterContainer,
   [StepKind.dashboard]: DashboardContainer,
+  [StepKind.update7702]: Update7702Page,  
+  [StepKind.success]: SuccessContainer,
 };
 
 // Create a complete step structure that combines metadata with components

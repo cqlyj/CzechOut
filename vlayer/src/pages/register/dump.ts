@@ -1,25 +1,23 @@
-import { proxy, snapshot } from 'valtio';
-import type { EventLog } from 'web3';
-import Web3 from 'web3';
+import { proxy } from 'valtio';
+import { sepolia } from 'viem/chains';
 
-import abiDraw from './abiDraw.json';
-import abiFomo from './abiFomo.json';
-import abiJackpot from './abiJackpot.json';
-import abiMarketplace from './abiMarketplace.json';
-import abiNFT from './abiNFT.json';
-import abiReferral from './abiReferral.json';
-import abiToken from './abiToken.json';
-import { appState } from './state';
+// Add type for window.ethereum
+interface EthereumProvider {
+	request: (args: { method: string; params?: any[] }) => Promise<any>;
+	on: (event: string, callback: (accounts: string[]) => void) => void;
+	removeListener: (event: string, callback: (accounts: string[]) => void) => void;
+}
 
-export const opBNBChainTarget = {
-	chainId: '0x15EB',
-	chainName: 'opBNB Testnet',
+export const sepoliaChainTarget = {
+	chainId: `0x${sepolia.id.toString(16)}`,
+	chainName: 'Sepolia',
 	nativeCurrency: {
-		symbol: 'tBNB',
-		decimals: 18,
+		name: 'SepoliaETH',
+		symbol: 'SEP',
+		decimals: 18
 	},
-	rpcUrls: ['https://opbnb-testnet-rpc.bnbchain.org'],
-	blockExplorerUrls: ['https://opbnb-testnet.bscscan.com'],
+	rpcUrls: ['https://rpc.sepolia.org'],
+	blockExplorerUrls: ['https://sepolia.etherscan.io']
 };
 
 export const getAccount = async () => {
@@ -51,103 +49,153 @@ export const connectWallet = async () => {
 };
 
 export const ensureNetworkTarget = async () => {
-	await window.ethereum?.request({
-		method: 'wallet_addEthereumChain',
-		params: [opBNBChainTarget],
-	});
-	await window.ethereum?.request({
-		method: 'wallet_switchEthereumChain',
-		params: [
-			{
-				chainId: opBNBChainTarget.chainId,
-			},
-		],
-	});
+	try {
+		await window.ethereum?.request({
+			method: 'wallet_switchEthereumChain',
+			params: [{ chainId: sepoliaChainTarget.chainId }],
+		});
+	} catch (switchError: any) {
+		if (switchError.code === 4902) {
+			try {
+				await window.ethereum?.request({
+					method: 'wallet_addEthereumChain',
+					params: [sepoliaChainTarget],
+				});
+			} catch (addError) {
+				console.error("Failed to add Sepolia network:", addError);
+				throw new Error("Failed to add Sepolia network. Please add it manually in MetaMask.");
+			}
+		} else {
+			console.error("Failed to switch to Sepolia network:", switchError);
+			throw new Error("Failed to switch to Sepolia network. Please switch manually in MetaMask.");
+		}
+	}
 };
 
 export const handleAccountChanged = (accounts: string[]) => {
 	appState.address = accounts[0];
-	appState.referredAddress = undefined;
 };
 
-export enum SmartContract {
-	Token = '0x69fBe552E6361A7620Bb2C106259Be301049E087',
-	Marketplace = '0xe43BeE387e5d89c299730f7B7b581D35af753494',
-	Draw = '0xe0320089466D923f3401F3b50CBEBE51Fba5C868',
-	NFT = '0x49430AB34Dad2622b3327B57e517D22a2488E530',
-	Jackpot = '0xBBda289cEe994B0927e45F9682faCAa1e1658916',
-	Referral = '0xC8155eDB016b8Dd8863c77D4EE6015326F5b8a9d',
-	Fomo = '0x227eebC2f5BBb3d636d3F7027690a01A3fbA38DD',
-}
+// Contract configuration
+export const REGISTRY_ADDRESS = "0x081C0AF74DE93A30517aa9A5d9ae915d0070dFaD";
 
-export const web3 = new Web3(window.ethereum);
-const web3Socket = new Web3(
-	new Web3.providers.WebsocketProvider('wss://opbnb-testnet.publicnode.com'),
-);
-
-const loadContract = (abi: any, contract: SmartContract) => {
-	return new web3.eth.Contract(abi, contract);
+// Contract data
+export const CONTRACT_DATA = {
+	walletAddress: "1316983660714018258856208543902547530655016273103",
+	intent: "0", // 0 for Register
+	credential_hash: "10798637195398541115846500520847030454002011415890242228013493563347262743063",
+	nonce: "0",
+	result_hash: "6998534309948587417642352072861863737802915918270421050506483615366587194343"
 };
 
-const marketplaceContract = loadContract(
-	abiMarketplace,
-	SmartContract.Marketplace,
-);
-const tokenContract = loadContract(abiToken, SmartContract.Token);
-const nftContract = loadContract(abiNFT, SmartContract.NFT);
-const jackpotContract = loadContract(abiJackpot, SmartContract.Jackpot);
-const referralContract = loadContract(abiReferral, SmartContract.Referral);
-const fomoContract = loadContract(abiFomo, SmartContract.Fomo);
-const drawContract = loadContract(abiDraw, SmartContract.Draw);
-
-export const faucetToken = async (address: string, amount: number) => {
-	await tokenContract.methods.mint(address, amount * 10 ** 6).send({
-		from: address,
-	});
+export const PROOF_INPUTS = {
+	pi_a: [
+		"2197365074930441172562320286017592319606016523187233735472877984686949884444",
+		"12419084257843043864599895314577222854595602149803275973080400317902916398412",
+	],
+	pi_b: [
+		[
+			"8553461446515389456340504879855382892721305805980927876080791965073846935769",
+            "3564027389153654170075879668253387134676664289509054989558492184521994540471"
+		],
+		[
+			"4239427432560049063478156083709807694857249960721213881333558021679146770154",
+            "16431733289555767918428985945867533764208532043094283609636480920329279748284"
+		],
+	],
+	pi_c: [
+		"9820816659410945519613876028212060578037291530551799316209333014188323950644",
+		"5910784747590369986348743262087862855747736048380595679644493876268696122156",
+	],
 };
 
-export const purchasePack = async (pack: number, card: number) => {
-	const { address, referredAddress } = snapshot(appState);
-
-	try {
-		if (!address) throw new Error('Please connect wallet');
-
-		const allowanceRequire = pack === 1 ? 100000000 : 10000000;
-		const allowanceGrant = (await tokenContract.methods
-			.allowance(address, SmartContract.Marketplace)
-			.call()) as bigint;
-		console.log(Number(allowanceGrant), '<<< allowance');
-		console.log(allowanceRequire, '<<< required');
-		const isAllowanceEnough = Number(allowanceGrant) >= allowanceRequire;
-		console.log('allowance enough: ', isAllowanceEnough);
-		if (!isAllowanceEnough) {
-			await tokenContract.methods
-				.approve(SmartContract.Marketplace, allowanceRequire)
-				.send({ from: address });
-		}
-
-		const result = await marketplaceContract.methods
-			.purchasePack(
-				pack,
-				card,
-				referredAddress || '0x0000000000000000000000000000000000000000',
-			)
-			.send({
-				from: address,
-			});
-		appState.transactionId = result.transactionHash;
-
-		const requestIdHash = result.logs.find(
-			(log) => log.address === SmartContract.Draw.toLowerCase(),
-		)?.topics?.[1];
-
-		if (requestIdHash) {
-			const decString = web3.utils.hexToNumberString(requestIdHash);
-			appState.requestId = decString;
-		}
-
-		return result;
-	} catch (error) {
-		console.log(error);
+// Registry ABI
+export const RegistryABI = [
+	// {
+	// 	name: 'register',
+	// 	type: 'function',
+	// 	stateMutability: 'nonpayable',
+	// 	inputs: [
+	// 		{ name: '_pA', type: 'uint[2]' },
+	// 		{ name: '_pB', type: 'uint[2][2]' },
+	// 		{ name: '_pC', type: 'uint[2]' },
+	// 		{ name: 'wallet', type: 'uint256' },
+	// 		{ name: 'intent', type: 'uint256' },
+	// 		{ name: 'credential_hash', type: 'uint256' },
+	// 		{ name: 'nonce', type: 'uint256' },
+	// 		{ name: 'result_hash', type: 'uint256' }
+	// 	],
+	// 	outputs: []
+	// },
+    {
+        "type":"function","name":"register","inputs":[{"name":"_pA","type":"uint256[2]","internalType":"uint256[2]"},{"name":"_pB","type":"uint256[2][2]","internalType":"uint256[2][2]"},{"name":"_pC","type":"uint256[2]","internalType":"uint256[2]"},{"name":"wallet","type":"uint256","internalType":"uint256"},{"name":"intent","type":"uint256","internalType":"uint256"},{"name":"credential_hash","type":"uint256","internalType":"uint256"},{"name":"nonce","type":"uint256","internalType":"uint256"},{"name":"result_hash","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"
+    },
+	{
+		name: 'recover',
+		type: 'function',
+		stateMutability: 'nonpayable',
+		inputs: [
+			{ name: '_pA', type: 'uint256[2]' },
+			{ name: '_pB', type: 'uint256[2][2]' },
+			{ name: '_pC', type: 'uint256[2]' },
+			{ name: 'wallet', type: 'uint256' },
+			{ name: 'intent', type: 'uint256' },
+			{ name: 'credential_hash', type: 'uint256' },
+			{ name: 'nonce', type: 'uint256' },
+			{ name: 'result_hash', type: 'uint256' }
+		],
+		outputs: []
+	},
+	{
+		name: 'getCredentialHash',
+		type: 'function',
+		stateMutability: 'view',
+		inputs: [{ name: 'wallet', type: 'uint256' }],
+		outputs: [{ name: '', type: 'uint256' }]
+	},
+	{
+		name: 'getUsedNonce',
+		type: 'function',
+		stateMutability: 'view',
+		inputs: [
+			{ name: 'wallet', type: 'uint256' },
+			{ name: 'nonce', type: 'uint256' }
+		],
+		outputs: [{ name: '', type: 'bool' }]
+	},
+	{
+		name: 'uintToAddress',
+		type: 'function',
+		stateMutability: 'pure',
+		inputs: [{ name: '_wallet', type: 'uint256' }],
+		outputs: [{ name: '', type: 'address' }]
+	},
+	{
+		name: 'Registered',
+		type: 'event',
+		anonymous: false,
+		inputs: [
+			{ name: 'wallet', type: 'uint256', indexed: true },
+			{ name: 'credential_hash', type: 'uint256', indexed: false },
+			{ name: 'nonce', type: 'uint256', indexed: false }
+		]
+	},
+	{
+		name: 'Recover',
+		type: 'event',
+		anonymous: false,
+		inputs: [
+			{ name: 'wallet', type: 'uint256', indexed: true },
+			{ name: 'credential_hash', type: 'uint256', indexed: false },
+			{ name: 'nonce', type: 'uint256', indexed: false }
+		]
 	}
-};
+] as const;
+
+// App state
+export const appState = proxy({
+	address: '',
+	error: '',
+	isLoading: false,
+	isContractInitialized: false
+});

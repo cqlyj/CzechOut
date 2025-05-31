@@ -7,7 +7,7 @@ async function main() {
 
   // Inputs
   // @TODO: dynamically get those information later
-  const walletAddressHex = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  const walletAddressHex = "0xE6af96Fd3C88BF66b842B5a1669Da610e399c4cF";
   const pin = 123456;
   const intent = 0;
   const nonce = 0;

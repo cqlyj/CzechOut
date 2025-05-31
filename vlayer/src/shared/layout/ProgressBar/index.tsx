@@ -16,10 +16,10 @@ export const ProgressBar = () => {
         Register
       </li>
       <li className={`step text-black text-xs ${activeStepClass(2)}`}>
-        Dashboard
+        Update 7702
       </li>
       <li className={`step text-black text-xs ${activeStepClass(3)}`}>
-        Confirm
+        Success
       </li>
     </motion.ul>
   );

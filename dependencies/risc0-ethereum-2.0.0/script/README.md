@@ -52,7 +52,7 @@ Set your RPC URL, as well as your public and private key:
 
 ```sh
 export RPC_URL="http://localhost:8545"
-export DEPLOYER_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+export DEPLOYER_ADDRESS="0xE6af96Fd3C88BF66b842B5a1669Da610e399c4cF"
 export DEPLOYER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 export CHAIN_KEY="anvil"
 ```
@@ -83,8 +83,8 @@ export ETHERSCAN_API_KEY=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].etherscan-api
 
 Example RPC URLs:
 
-* `https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY`
-* `https://sepolia.infura.io/v3/YOUR_API_KEY`
+- `https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY`
+- `https://sepolia.infura.io/v3/YOUR_API_KEY`
 
 ### Fireblocks
 
@@ -127,49 +127,49 @@ Then, in the instructions below, pass the `--fireblocks` (`-f`) flag to the `man
 
 1. Dry run the contract deployment:
 
-    > [!IMPORTANT]
-    > Adjust the `MIN_DELAY` to a value appropriate for the environment (e.g. 1 second for testnet and 604800 seconds (7 days) for mainnet).
+   > [!IMPORTANT]
+   > Adjust the `MIN_DELAY` to a value appropriate for the environment (e.g. 1 second for testnet and 604800 seconds (7 days) for mainnet).
 
-    ```sh
-    MIN_DELAY=1 \
-    PROPOSER="${ADMIN_ADDRESS:?}" \
-    EXECUTOR="${ADMIN_ADDRESS:?}" \
-    bash contracts/script/manage DeployTimelockRouter
+   ```sh
+   MIN_DELAY=1 \
+   PROPOSER="${ADMIN_ADDRESS:?}" \
+   EXECUTOR="${ADMIN_ADDRESS:?}" \
+   bash contracts/script/manage DeployTimelockRouter
 
-    ...
+   ...
 
-    == Logs ==
-      minDelay: 1
-      proposers: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-      executors: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-      admin: 0x0000000000000000000000000000000000000000
-      Deployed TimelockController to 0x5FbDB2315678afecb367f032d93F642f64180aa3
-      Deployed RiscZeroVerifierRouter to 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-    ```
+   == Logs ==
+     minDelay: 1
+     proposers: 0xE6af96Fd3C88BF66b842B5a1669Da610e399c4cF
+     executors: 0xE6af96Fd3C88BF66b842B5a1669Da610e399c4cF
+     admin: 0x0000000000000000000000000000000000000000
+     Deployed TimelockController to 0x5FbDB2315678afecb367f032d93F642f64180aa3
+     Deployed RiscZeroVerifierRouter to 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+   ```
 
 2. Run the command again with `--broadcast`.
 
-    This will result in two transactions sent from the deployer address.
+   This will result in two transactions sent from the deployer address.
 
 3. ~~Verify the contracts on Etherscan (or its equivalent) by running the command again without `--broadcast` and add `--verify`.~~
 
-    > [!WARNING]
-    > The verify functionality appears to be broken see #393
+   > [!WARNING]
+   > The verify functionality appears to be broken see #393
 
 4. Save the contract addresses to `deployment.toml`.
 
-    Load the addresses into your environment.
+   Load the addresses into your environment.
 
-    ```sh
-    export TIMELOCK_CONTROLLER=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].timelock-controller" contracts/deployment.toml | tee /dev/stderr)
-    export VERIFIER_ROUTER=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].router" contracts/deployment.toml | tee /dev/stderr)
-    ```
+   ```sh
+   export TIMELOCK_CONTROLLER=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].timelock-controller" contracts/deployment.toml | tee /dev/stderr)
+   export VERIFIER_ROUTER=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].router" contracts/deployment.toml | tee /dev/stderr)
+   ```
 
 5. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 ## Deploy a Groth16 verifier with emergency stop mechanism
 
@@ -179,50 +179,50 @@ This is a two-step process, guarded by the `TimelockController`.
 
 1. Dry run deployment of Groth16 verifier and estop:
 
-    ```sh
-    bash contracts/script/manage DeployEstopGroth16Verifier
-    ```
+   ```sh
+   bash contracts/script/manage DeployEstopGroth16Verifier
+   ```
 
-    > [!IMPORTANT]
-    > Check the logs from this dry run to verify the estop owner is the expected address.
-    > It should be equal to the RISC Zero admin address on the given chain.
-    > Note that it should not be the `TimelockController`.
-    > Also check the chain ID to ensure you are deploying to the chain you expect.
-    > And check the selector to make sure it matches what you expect.
+   > [!IMPORTANT]
+   > Check the logs from this dry run to verify the estop owner is the expected address.
+   > It should be equal to the RISC Zero admin address on the given chain.
+   > Note that it should not be the `TimelockController`.
+   > Also check the chain ID to ensure you are deploying to the chain you expect.
+   > And check the selector to make sure it matches what you expect.
 
 2. Send deployment transactions for verifier and estop by running the command again with `--broadcast`.
 
-    This will result in two transactions sent from the deployer address.
+   This will result in two transactions sent from the deployer address.
 
-    > [!NOTE]
-    > When using Fireblocks, sending a transaction to a particular address may require allow-listing it.
-    > In order to ensure that estop operations are possible, make sure to allow-list the new estop contract.
+   > [!NOTE]
+   > When using Fireblocks, sending a transaction to a particular address may require allow-listing it.
+   > In order to ensure that estop operations are possible, make sure to allow-list the new estop contract.
 
 3. ~~Verify the contracts on Etherscan (or its equivalent) by running the command again without `--broadcast` and add `--verify`.~~
 
-    > [!WARNING]
-    > The verify functionality appears to be broken see #393
+   > [!WARNING]
+   > The verify functionality appears to be broken see #393
 
 4. Add the addresses for the newly deployed contract to the `deployment.toml` file.
 
 5. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 6. Dry run the operation to schedule the operation to add the verifier to the router.
 
-    ```sh
-    VERIFIER_SELECTOR="0x..." bash contracts/script/manage ScheduleAddVerifier
-    ```
+   ```sh
+   VERIFIER_SELECTOR="0x..." bash contracts/script/manage ScheduleAddVerifier
+   ```
 
 7. Send the transaction for the scheduled update by running the command again with `--broadcast`.
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
-    > [!IMPORTANT]
-    > If the admin address is in Fireblocks, this will prompt the admins for approval.
+   > [!IMPORTANT]
+   > If the admin address is in Fireblocks, this will prompt the admins for approval.
 
 ### Finish the update
 
@@ -230,21 +230,21 @@ After the delay on the timelock controller has pass, the operation to add the ne
 
 1. Dry the transaction to execute the add verifier operation:
 
-    ```sh
-    VERIFIER_SELECTOR="0x..." bash contracts/script/manage FinishAddVerifier
-    ```
+   ```sh
+   VERIFIER_SELECTOR="0x..." bash contracts/script/manage FinishAddVerifier
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 3. Remove the `unroutable` field from the selected verifier.
 
 4. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 ## Deploy a set verifier with emergency stop mechanism
 
@@ -268,9 +268,9 @@ This is a two-step process, guarded by the `TimelockController`.
    > [!TIP]
    > You can use the following command to check that the uploaded ELF has the image ID you expect.
    >
-   >  ```sh
-   >  r0vm --id --elf <(curl $SET_BUILDER_GUEST_URL)
-   >  ```
+   > ```sh
+   > r0vm --id --elf <(curl $SET_BUILDER_GUEST_URL)
+   > ```
 
 2. Dry run deployment of the set verifier and estop:
 
@@ -287,22 +287,22 @@ This is a two-step process, guarded by the `TimelockController`.
 
 3. Send deployment transactions for the set verifier by running the command again with `--broadcast`.
 
-    This will result in two transactions sent from the deployer address.
+   This will result in two transactions sent from the deployer address.
 
-    > [!NOTE]
-    > When using Fireblocks, sending a transaction to a particular address may require allow-listing it.
-    > In order to ensure that estop operations are possible, make sure to allow-list the new estop contract.
+   > [!NOTE]
+   > When using Fireblocks, sending a transaction to a particular address may require allow-listing it.
+   > In order to ensure that estop operations are possible, make sure to allow-list the new estop contract.
 
 4. ~~Verify the contracts on Etherscan (or its equivalent) by running the command again without `--broadcast` and add `--verify`.~~
 
-    > [!WARNING]
-    > The verify functionality appears to be broken see #393
+   > [!WARNING]
+   > The verify functionality appears to be broken see #393
 
 5. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 6. Dry run the operation to schedule the operation to add the verifier to the router.
 
@@ -323,27 +323,27 @@ After the delay on the timelock controller has pass, the operation to add the ne
 
 1. Set the verifier selector and estop address for the set verifier:
 
-    ```sh
-    export VERIFIER_SELECTOR=$(bash contracts/script/manage SetVerifierSelector | grep selector | awk -F': ' '{print $2}' | tee /dev/stderr)
-    ```
+   ```sh
+   export VERIFIER_SELECTOR=$(bash contracts/script/manage SetVerifierSelector | grep selector | awk -F': ' '{print $2}' | tee /dev/stderr)
+   ```
 
 2. Dry the transaction to execute the add verifier operation:
 
-    ```sh
-    bash contracts/script/manage FinishAddVerifier
-    ```
+   ```sh
+   bash contracts/script/manage FinishAddVerifier
+   ```
 
 3. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 4. Remove the `unroutable` field from the selected verifier.
 
 5. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 ## Remove a verifier
 
@@ -353,49 +353,49 @@ This is a two-step process, guarded by the `TimelockController`.
 
 1. Set the verifier selector and estop address for the verifier:
 
-    > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol` for the `RiscZeroGroth16Verifier` or you can run `bash contracts/script/manage SetVerifierSelector` for the `RiscZeroSetVerifier`.
+   > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol` for the `RiscZeroGroth16Verifier` or you can run `bash contracts/script/manage SetVerifierSelector` for the `RiscZeroSetVerifier`.
 
-    ```sh
-    export VERIFIER_SELECTOR="0x..."
-    ```
+   ```sh
+   export VERIFIER_SELECTOR="0x..."
+   ```
 
 2. Dry the transaction to schedule the remove verifier operation:
 
-    ```sh
-    bash contracts/script/manage ScheduleRemoveVerifier
-    ```
+   ```sh
+   bash contracts/script/manage ScheduleRemoveVerifier
+   ```
 
 3. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 ### Finish the update
 
 1. Set the verifier selector and estop address for the verifier:
 
-    > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol` for the `RiscZeroGroth16Verifier` or you can run `bash contracts/script/manage SetVerifierSelector` for the `RiscZeroSetVerifier`.
+   > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol` for the `RiscZeroGroth16Verifier` or you can run `bash contracts/script/manage SetVerifierSelector` for the `RiscZeroSetVerifier`.
 
-    ```sh
-    export VERIFIER_SELECTOR="0x..."
-    ```
+   ```sh
+   export VERIFIER_SELECTOR="0x..."
+   ```
 
 2. Dry the transaction to execute the remove verifier operation:
 
-    ```sh
-    bash contracts/script/manage FinishRemoveVerifier
-    ```
+   ```sh
+   bash contracts/script/manage FinishRemoveVerifier
+   ```
 
 3. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 4. Update `deployment.toml` and set `unroutable = true` on the removed verifier.
 
 5. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 ## Update the TimelockController minimum delay
 
@@ -405,14 +405,14 @@ This is a two-step process, guarded by the `TimelockController`.
 
 1. Dry run the transaction:
 
-    ```sh
-    MIN_DELAY=10 \
-    bash contracts/script/manage ScheduleUpdateDelay
-    ```
+   ```sh
+   MIN_DELAY=10 \
+   bash contracts/script/manage ScheduleUpdateDelay
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 ### Finish the update
 
@@ -420,20 +420,20 @@ Execute the action:
 
 1. Dry run the transaction:
 
-    ```sh
-    MIN_DELAY=10 \
-    bash contracts/script/manage FinishUpdateDelay
-    ```
+   ```sh
+   MIN_DELAY=10 \
+   bash contracts/script/manage FinishUpdateDelay
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
-5. Test the deployment.
+3. Test the deployment.
 
-    ```console
-    FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
-    ```
+   ```console
+   FOUNDRY_PROFILE=deployment-test forge test -vv --fork-url=${RPC_URL:?}
+   ```
 
 ## Cancel a scheduled timelock operation
 
@@ -441,22 +441,22 @@ Use the following steps to cancel an operation that is pending on the `TimelockC
 
 1. Identifier the operation ID and set the environment variable.
 
-    > TIP: One way to get the operation ID is to open the contract in Etherscan and look at the events.
-    > On the `CallScheduled` event, the ID is labeled as `[topic1]`.
-    >
-    > ```sh
-    > open ${ETHERSCAN_URL:?}/address/${TIMELOCK_CONTROLLER:?}#events
-    > ```
+   > TIP: One way to get the operation ID is to open the contract in Etherscan and look at the events.
+   > On the `CallScheduled` event, the ID is labeled as `[topic1]`.
+   >
+   > ```sh
+   > open ${ETHERSCAN_URL:?}/address/${TIMELOCK_CONTROLLER:?}#events
+   > ```
 
-    ```sh
-    export OPERATION_ID="0x..." \
-    ```
+   ```sh
+   export OPERATION_ID="0x..." \
+   ```
 
 2. Dry the transaction to cancel the operation.
 
-    ```sh
-    bash contracts/script/manage CancelOperation -f
-    ```
+   ```sh
+   bash contracts/script/manage CancelOperation -f
+   ```
 
 3. Run the command again with `--broadcast`
 
@@ -466,55 +466,55 @@ This is a two-step process, guarded by the `TimelockController`.
 
 Three roles are supported:
 
-* `proposer`
-* `executor`
-* `canceller`
+- `proposer`
+- `executor`
+- `canceller`
 
 ### Schedule the update
 
 1. Dry run the transaction:
 
-    ```sh
-    ROLE="executor" \
-    ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
-    bash contracts/script/manage ScheduleGrantRole
-    ```
+   ```sh
+   ROLE="executor" \
+   ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
+   bash contracts/script/manage ScheduleGrantRole
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 ### Finish the update
 
 1. Dry run the transaction:
 
-    ```sh
-    ROLE="executor" \
-    ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
-    bash contracts/script/manage FinishGrantRole
-    ```
+   ```sh
+   ROLE="executor" \
+   ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
+   bash contracts/script/manage FinishGrantRole
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 3. Confirm the update:
 
-    ```sh
-    # Query the role code.
-    cast call --rpc-url ${RPC_URL:?} \
-        ${TIMELOCK_CONTROLLER:?} \
-        'EXECUTOR_ROLE()(bytes32)'
-    0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63
+   ```sh
+   # Query the role code.
+   cast call --rpc-url ${RPC_URL:?} \
+       ${TIMELOCK_CONTROLLER:?} \
+       'EXECUTOR_ROLE()(bytes32)'
+   0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63
 
-    # Check that the account now has that role.
-    cast call --rpc-url ${RPC_URL:?} \
-        ${TIMELOCK_CONTROLLER:?} \
-        'hasRole(bytes32, address)(bool)' \
-        0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
-        0x00000000000000aabbccddeeff00000000000000
-    true
-    ```
+   # Check that the account now has that role.
+   cast call --rpc-url ${RPC_URL:?} \
+       ${TIMELOCK_CONTROLLER:?} \
+       'hasRole(bytes32, address)(bool)' \
+       0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
+       0x00000000000000aabbccddeeff00000000000000
+   true
+   ```
 
 ## Revoke access to the TimelockController
 
@@ -522,23 +522,23 @@ This is a two-step process, guarded by the `TimelockController`.
 
 Three roles are supported:
 
-* `proposer`
-* `executor`
-* `canceller`
+- `proposer`
+- `executor`
+- `canceller`
 
 ### Schedule the update
 
 1. Dry run the transaction:
 
-    ```sh
-    ROLE="executor" \
-    ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
-    bash contracts/script/manage ScheduleRevokeRole
-    ```
+   ```sh
+   ROLE="executor" \
+   ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
+   bash contracts/script/manage ScheduleRevokeRole
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 Confirm the role code:
 
@@ -553,67 +553,67 @@ cast call --rpc-url ${RPC_URL:?} \
 
 1. Dry run the transaction:
 
-    ```sh
-    ROLE="executor" \
-    ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
-    bash contracts/script/manage FinishRevokeRole
-    ```
+   ```sh
+   ROLE="executor" \
+   ACCOUNT="0x00000000000000aabbccddeeff00000000000000" \
+   bash contracts/script/manage FinishRevokeRole
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 3. Confirm the update:
 
-    ```sh
-    # Query the role code.
-    cast call --rpc-url ${RPC_URL:?} \
-        ${TIMELOCK_CONTROLLER:?} \
-        'EXECUTOR_ROLE()(bytes32)'
-    0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63
+   ```sh
+   # Query the role code.
+   cast call --rpc-url ${RPC_URL:?} \
+       ${TIMELOCK_CONTROLLER:?} \
+       'EXECUTOR_ROLE()(bytes32)'
+   0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63
 
-    # Check that the account no longer has that role.
-    cast call --rpc-url ${RPC_URL:?} \
-        ${TIMELOCK_CONTROLLER:?} \
-        'hasRole(bytes32, address)(bool)' \
-        0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
-        0x00000000000000aabbccddeeff00000000000000
-    false
-    ```
+   # Check that the account no longer has that role.
+   cast call --rpc-url ${RPC_URL:?} \
+       ${TIMELOCK_CONTROLLER:?} \
+       'hasRole(bytes32, address)(bool)' \
+       0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
+       0x00000000000000aabbccddeeff00000000000000
+   false
+   ```
 
 ## Renounce access to the TimelockController
 
 If your private key is compromised, you can renounce your role(s) without waiting for the time delay. Repeat this action for any of the roles you might have, such as:
 
-* proposer
-* executor
-* canceller
+- proposer
+- executor
+- canceller
 
 > ![WARNING]
 > Renouncing authorization on the timelock controller may make it permanently inoperable.
 
 1. Dry run the transaction:
 
-    ```sh
-    RENOUNCE_ROLE="executor" \
-    RENOUNCE_ADDRESS="0x00000000000000aabbccddeeff00000000000000" \
-    bash contracts/script/manage RenounceRole
-    ```
+   ```sh
+   RENOUNCE_ROLE="executor" \
+   RENOUNCE_ADDRESS="0x00000000000000aabbccddeeff00000000000000" \
+   bash contracts/script/manage RenounceRole
+   ```
 
 2. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 3. Confirm:
 
-    ```sh
-    cast call --rpc-url ${RPC_URL:?} \
-        ${TIMELOCK_CONTROLLER:?} \
-        'hasRole(bytes32, address)(bool)' \
-        0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
-        ${RENOUNCE_ADDRESS:?}
-    false
-    ```
+   ```sh
+   cast call --rpc-url ${RPC_URL:?} \
+       ${TIMELOCK_CONTROLLER:?} \
+       'hasRole(bytes32, address)(bool)' \
+       0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63 \
+       ${RENOUNCE_ADDRESS:?}
+   false
+   ```
 
 ## Activate the emergency stop
 
@@ -624,32 +624,32 @@ Activate the emergency stop:
 
 1. Set the verifier selector and estop address for the verifier:
 
-    > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol`
+   > TIP: One place to find this information is in `./contracts/test/RiscZeroGroth16Verifier.t.sol`
 
-    ```sh
-    export VERIFIER_SELECTOR="0x..."
-    export VERIFIER_ESTOP=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].verifiers[] | select(.selector == \"${VERIFIER_SELECTOR:?}\") | .estop" contracts/deployment.toml | tee /dev/stderr)
-    ```
+   ```sh
+   export VERIFIER_SELECTOR="0x..."
+   export VERIFIER_ESTOP=$(yq eval -e ".chains[\"${CHAIN_KEY:?}\"].verifiers[] | select(.selector == \"${VERIFIER_SELECTOR:?}\") | .estop" contracts/deployment.toml | tee /dev/stderr)
+   ```
 
 2. Dry run the transaction
 
-    ```sh
-    VERIFIER_ESTOP=${VERIFIER_ESTOP:?} \
-    bash contracts/script/manage ActivateEstop
-    ```
+   ```sh
+   VERIFIER_ESTOP=${VERIFIER_ESTOP:?} \
+   bash contracts/script/manage ActivateEstop
+   ```
 
 3. Run the command again with `--broadcast`
 
-    This will send one transaction from the admin address.
+   This will send one transaction from the admin address.
 
 4. Test the activation:
 
-    ```sh
-    cast call --rpc-url ${RPC_URL:?} \
-        ${VERIFIER_ESTOP:?} \
-        'paused()(bool)'
-    true
-    ```
+   ```sh
+   cast call --rpc-url ${RPC_URL:?} \
+       ${VERIFIER_ESTOP:?} \
+       'paused()(bool)'
+   true
+   ```
 
 [yq-install]: https://github.com/mikefarah/yq?tab=readme-ov-file#install
 [alloy-chains]: https://github.com/alloy-rs/chains/blob/main/src/named.rs

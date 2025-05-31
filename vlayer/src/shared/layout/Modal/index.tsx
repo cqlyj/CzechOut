@@ -61,7 +61,7 @@ export const Modal = ({ children }: { children: React.ReactNode }) => {
         >
           <Navigation />
           <AnimatePresence>
-            {!isWelcome && !isSuccessStep && <ProgressBar />}
+            {!isWelcome && currentStep?.kind !== StepKind.dashboard && <ProgressBar />}
           </AnimatePresence>
           <ErrorBoundary FallbackComponent={StepErrorBoundaryComponent}>
             <AnimatePresence>
@@ -79,7 +79,10 @@ export const Modal = ({ children }: { children: React.ReactNode }) => {
                 <h3 className={`header ${descClass}`}>{currentStep?.title}</h3>
               )}
               {currentStep?.description && (
-                <p className={`h-[116px] desc ${descClass}`}>{description}</p>
+                <p 
+                  className={`h-[116px] desc ${descClass}`}
+                  dangerouslySetInnerHTML={{ __html: description }}
+                />
               )}
               <modalContext.Provider value={{ showModal, closeModal }}>
                 {children}

@@ -22,7 +22,7 @@ createAppKit({
   metadata: {
     name: "vlayer-email-proof-example",
     description: "vlayer Email Proof Example",
-    url: "https://vlayer.xyz",
+    url: "http://localhost:5173",
     icons: ["https://avatars.githubusercontent.com/u/179229932"],
   },
   themeVariables: {
