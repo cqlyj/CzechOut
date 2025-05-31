@@ -4,19 +4,24 @@ import { AppErrorBoundaryComponent } from "../../shared/errors/ErrorBoundary";
 import { Layout } from "../../shared/layout/Layout";
 import { getAllSteps } from "./steps";
 import { DashboardContainer } from "../../pages/dashboard";
+import { WelcomePage } from "../../pages/welcome";
 
 const Router = () => {
   return (
     <BrowserRouter>
       <ErrorBoundary FallbackComponent={AppErrorBoundaryComponent}>
         <Routes>
-          {/* Dashboard route without modal wrapper */}
+          {/* Full-screen routes without modal wrapper */}
           <Route path="/dashboard" element={<DashboardContainer />} />
+          <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/" element={<WelcomePage />} />
 
           {/* All other routes with modal wrapper */}
-          <Route path="/" element={<Layout />}>
+          <Route path="/app" element={<Layout />}>
             {getAllSteps()
-              .filter((step) => step.path !== "dashboard") // Exclude dashboard from modal layosut
+              .filter(
+                (step) => step.path !== "dashboard" && step.path !== "welcome"
+              ) // Exclude dashboard and welcome from modal layout
               .map((step) => (
                 <Route
                   key={step.path}
