@@ -30,3 +30,9 @@ simulate-verification-call:
 
 deploy-all:
 	@forge script script/DeployAll.s.sol:DeployAll --rpc-url ${SEPOLIA_RPC_URL} --account burner --sender 0xFB6a372F2F51a002b390D18693075157A459641F --broadcast --verify --verifier blockscout --verifier-url https://eth-sepolia.blockscout.com/api/ -vvvv
+
+deploy-verifier:
+	@forge script script/DeployAll.s.sol:DeployAll --rpc-url http://127.0.0.1:8545 --account default --broadcast -vvvv
+
+register:
+	@forge script script/Interactions.s.sol:Register --rpc-url http://127.0.0.1:8545 --account default --broadcast -vvvv
