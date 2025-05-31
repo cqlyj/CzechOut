@@ -13,13 +13,13 @@ export const ProgressBar = () => {
   return (
     <motion.ul className="steps w-full" {...motionConfig}>
       <li className={`step text-black text-xs ${activeStepClass(1)}`}>
-        Connect Wallet
+        Register
       </li>
       <li className={`step text-black text-xs ${activeStepClass(2)}`}>
-        Send email
+        Dashboard
       </li>
       <li className={`step text-black text-xs ${activeStepClass(3)}`}>
-        Mint NFT
+        Confirm
       </li>
     </motion.ul>
   );

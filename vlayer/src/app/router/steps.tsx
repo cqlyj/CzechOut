@@ -9,6 +9,7 @@ import {
 } from "../../pages";
 import React from "react";
 import { StepKind, stepsMeta, StepMeta } from "./types";
+import { DashboardContainer } from "../../pages/dashboard";
 
 // Define a component mapping type
 export type StepComponentMap = Record<StepKind, React.ComponentType>;
@@ -22,6 +23,7 @@ export const stepComponents: StepComponentMap = {
   [StepKind.mintNft]: MintNFTContainer,
   [StepKind.success]: SuccessContainer,
   [StepKind.register]: RegisterContainer,
+  [StepKind.dashboard]: DashboardContainer,
 };
 
 // Create a complete step structure that combines metadata with components

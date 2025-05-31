@@ -13,7 +13,7 @@ contract WebProofProver is Prover {
     using WebLib for Web;
 
     // @TODO: Replace with the actual data URL
-    string dataUrl = "https://api.example/settings.json";
+    string dataUrl = "https://localhost:3000/settings.json";
 
     function main(
         WebProof calldata webProof,
