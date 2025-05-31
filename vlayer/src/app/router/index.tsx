@@ -5,6 +5,7 @@ import { Layout } from "../../shared/layout/Layout";
 import { getAllSteps } from "./steps";
 import { DashboardContainer } from "../../pages/dashboard";
 import { WelcomePage } from "../../pages/welcome";
+import { RegisterContainer } from "../../pages/register";
 
 const Router = () => {
   return (
@@ -14,14 +15,18 @@ const Router = () => {
           {/* Full-screen routes without modal wrapper */}
           <Route path="/dashboard" element={<DashboardContainer />} />
           <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/app/register" element={<RegisterContainer />} />
           <Route path="/" element={<WelcomePage />} />
 
           {/* All other routes with modal wrapper */}
           <Route path="/app" element={<Layout />}>
             {getAllSteps()
               .filter(
-                (step) => step.path !== "dashboard" && step.path !== "welcome"
-              ) // Exclude dashboard and welcome from modal layout
+                (step) =>
+                  step.path !== "dashboard" &&
+                  step.path !== "welcome" &&
+                  step.path !== "register"
+              ) // Exclude dashboard, welcome, and register from modal layout
               .map((step) => (
                 <Route
                   key={step.path}
@@ -35,4 +40,5 @@ const Router = () => {
     </BrowserRouter>
   );
 };
+
 export default Router;
