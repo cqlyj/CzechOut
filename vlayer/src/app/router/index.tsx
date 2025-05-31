@@ -6,6 +6,7 @@ import { getAllSteps } from "./steps";
 import { DashboardContainer } from "../../pages/dashboard";
 import { WelcomePage } from "../../pages/welcome";
 import { RegisterContainer } from "../../pages/register";
+import { Update7702Page } from "../../pages/update7702";
 
 const Router = () => {
   return (
@@ -16,6 +17,7 @@ const Router = () => {
           <Route path="/dashboard" element={<DashboardContainer />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/app/register" element={<RegisterContainer />} />
+          <Route path="/account-setup" element={<Update7702Page />} />
           <Route path="/" element={<WelcomePage />} />
 
           {/* All other routes with modal wrapper */}
@@ -25,8 +27,9 @@ const Router = () => {
                 (step) =>
                   step.path !== "dashboard" &&
                   step.path !== "welcome" &&
-                  step.path !== "register"
-              ) // Exclude dashboard, welcome, and register from modal layout
+                  step.path !== "register" &&
+                  step.path !== "account-setup"
+              ) // Exclude dashboard, welcome, register, and account-setup from modal layout
               .map((step) => (
                 <Route
                   key={step.path}
