@@ -1,0 +1,31 @@
+{
+  "name": "czechout-api",
+  "version": "1.0.0",
+  "description": "CzechOut Transfer API - REST API for USDC transfers via state channels",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test-api.js",
+    "test:full": "node test-api.js --with-transfer"
+  },
+  "dependencies": {
+    "@erc7824/nitrolite": "^0.2.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.1",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "ws": "^8.18.0"
+  },
+  "keywords": [
+    "czechout",
+    "usdc",
+    "transfer",
+    "state-channels",
+    "api",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT"
+}
