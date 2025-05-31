@@ -1,0 +1,4 @@
+*.json filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
+human-login/public/models/*.bin filter=lfs diff=lfs merge=lfs -text
+human-login/public/models/*.json filter=lfs diff=lfs merge=lfs -text
