@@ -1,30 +1,3 @@
-{
-  "_format": "hh-sol-artifact-1",
-  "contractName": "ERC165",
-  "sourceName": "contracts/utils/introspection/ERC165.sol",
-  "abi": [
-    {
-      "inputs": [
-        {
-          "internalType": "bytes4",
-          "name": "interfaceId",
-          "type": "bytes4"
-        }
-      ],
-      "name": "supportsInterface",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
-  ],
-  "bytecode": "0x",
-  "deployedBytecode": "0x",
-  "linkReferences": {},
-  "deployedLinkReferences": {}
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:7aed0c76df70bc37995699fbc390f02c27c5bb99c72588c426a28612fefee6f9
+size 622

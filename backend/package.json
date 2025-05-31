@@ -1,17 +1,3 @@
-{
-  "name": "nitrolite-backend",
-  "version": "1.0.0",
-  "description": "Simple Nitrolite state channel backend",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "transfer": "node transfer.js"
-  },
-  "dependencies": {
-    "@erc7824/nitrolite": "^0.2.6",
-    "dotenv": "^16.4.5",
-    "ethers": "^6.13.1",
-    "viem": "^2.30.5",
-    "ws": "^8.18.0"
-  }
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:19719ba3616d2097d6ed211d0fb730099ee6dda8f5e719a07c3a75ad15f78955
+size 376

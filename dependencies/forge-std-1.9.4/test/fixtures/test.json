@@ -1,8 +1,3 @@
-{
-  "a": 123,
-  "b": "test",
-  "c": {
-    "a": 123,
-    "b": "test"
-  }
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:79965907225af6bd76ccc20c0279e84e1d916529a423fbaba8f5b6ef91d5ee26
+size 73

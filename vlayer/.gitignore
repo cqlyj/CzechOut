@@ -27,3 +27,4 @@ dist-ssr
 .vercel
 test-results
 playwright-report
+human-login/node_modules

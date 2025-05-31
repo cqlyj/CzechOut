@@ -4,6 +4,7 @@
     "": {
       "name": "simple-email-proof",
       "dependencies": {
+        "simple-email-proof": ".",
         "@heroicons/react": "^2.2.0",
         "@reown/appkit": "^1.6.9",
         "@reown/appkit-adapter-wagmi": "^1.6.9",
@@ -1080,6 +1081,8 @@
     "shebang-regex": ["shebang-regex@3.0.0", "", {}, "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="],
 
     "signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
+
+    "simple-email-proof": ["simple-email-proof@file:", { "dependencies": { "@heroicons/react": "^2.2.0", "@reown/appkit": "^1.6.9", "@reown/appkit-adapter-wagmi": "^1.6.9", "@sentry/react": "^8.54.0", "@tanstack/react-query": "^5.72.1", "@vercel/analytics": "^1.4.1", "@vlayer/react": "1.0.2-nightly-20250530-3f01bfdcfb6b20d608f7bcef25f9907164ad3966", "@vlayer/sdk": "1.0.2-nightly-20250530-3f01bfdcfb6b20d608f7bcef25f9907164ad3966", "debug": "^4.4.0", "motion": "^12.4.2", "react": "^18.3.1", "react-daisyui": "^5.0.5", "react-dom": "^18.3.1", "react-error-boundary": "^5.0.0", "react-router": "^7.1.5", "usehooks-ts": "^3.1.1", "uuid": "^11.0.5", "viem": "2.27.0", "wagmi": "2.14.16", "zod": "^3.24.4" }, "devDependencies": { "@johanneskares/wallet-mock": "^1.4.1", "@playwright/test": "1.52.0", "@types/bun": "^1.1.6", "@types/eslint__js": "^8.42.3", "@types/react": "^18.3.11", "@types/react-dom": "^18.3.1", "@vitejs/plugin-react": "^4.3.3", "autoprefixer": "^10.4.20", "globals": "^15.11.0", "playwright": "1.52.0", "postcss": "^8.4.47", "solhint": "5.0.5", "tailwindcss": "^3.4.14", "typescript": "^5.5.4", "vite": "^5.4.9" } }],
 
     "slash": ["slash@3.0.0", "", {}, "sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q=="],
 
