@@ -323,6 +323,8 @@ export const RegisterContainer = () => {
       localStorage.setItem("userEmail", email);
       localStorage.setItem("userLoggedIn", "true");
       localStorage.setItem("registrationCompleted", "true");
+      // Set EIP-7702 usage flag for transaction history verification
+      localStorage.setItem("czechout_eip7702_used", "true");
 
       setCurrentStep("completed");
       setTimeout(() => {
