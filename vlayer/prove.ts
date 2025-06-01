@@ -1,93 +1,21 @@
 import fs from "fs";
-import { createVlayerClient, preverifyEmail } from "@vlayer/sdk";
-import proverSpec from "../out/EmailDomainProver.sol/EmailDomainProver";
-import verifierSpec from "../out/EmailProofVerifier.sol/EmailDomainVerifier";
-import {
-  createContext,
-  deployVlayerContracts,
-  getConfig,
-} from "@vlayer/sdk/config";
+import { preverifyEmail } from "@vlayer/sdk";
+// .. Import prover contract ABI
 
-const mimeEmail = fs.readFileSync("../testdata/verify_vlayer.eml").toString();
+// Read the email MIME-encoded file content
+const email = fs.readFileSync("email.eml").toString();
 
-const config = getConfig();
+// Prepare the email for verification
+const unverifiedEmail = await preverifyEmail(email);
 
-const {
-  chain,
-  ethClient,
-  account: john,
-  proverUrl,
-  dnsServiceUrl,
-  confirmations,
-} = createContext(config);
+// Create vlayer server client
+const vlayer = createVlayerClient();
 
-if (!john) {
-  throw new Error(
-    "No account found make sure EXAMPLES_TEST_PRIVATE_KEY is set in your environment variables",
-  );
-}
-
-// const { prover, verifier } = await deployVlayerContracts({
-//   proverSpec,
-//   verifierSpec,
-//   proverArgs: [],
-//   verifierArgs: [],
-// });
-
-const prover = "0x17910b3118F1Bd104E75B0CF1019EB5541e8eAfA";
-const verifier = "0x132f49d0fEBE751328389A2ffe0d804b5bafbA76";
-
-if (!dnsServiceUrl) {
-  throw new Error("DNS service URL is not set");
-}
-
-console.log("Proving...");
-const vlayer = createVlayerClient({
-  url: proverUrl,
-  token: config.token,
-});
 const hash = await vlayer.prove({
   address: prover,
-  proverAbi: proverSpec.abi,
+  proverAbi: emailProofProver.abi,
   functionName: "main",
-  chainId: chain.id,
-  gasLimit: config.gasLimit,
-  args: [
-    await preverifyEmail({
-      mimeEmail,
-      dnsResolverUrl: dnsServiceUrl,
-      token: config.token,
-    }),
-  ],
+  args: [unverifiedEmail],
+  chainId: foundry,
 });
 const result = await vlayer.waitForProvingResult({ hash });
-
-console.log("Verifying...");
-
-// Workaround for viem estimating gas with `latest` block causing future block assumptions to fail on slower chains like mainnet/sepolia
-const gas = await ethClient.estimateContractGas({
-  address: verifier,
-  abi: verifierSpec.abi,
-  functionName: "verify",
-  args: result,
-  account: john,
-  blockTag: "pending",
-});
-
-const verificationHash = await ethClient.writeContract({
-  address: verifier,
-  abi: verifierSpec.abi,
-  functionName: "verify",
-  args: result,
-  account: john,
-  gas,
-});
-
-const receipt = await ethClient.waitForTransactionReceipt({
-  hash: verificationHash,
-  confirmations,
-  retryCount: 60,
-  retryDelay: 1000,
-});
-
-console.log(`Verification result: ${receipt.status}`);

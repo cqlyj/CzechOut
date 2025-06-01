@@ -7,14 +7,59 @@ import {
   ArrowDownIcon,
   GiftIcon,
   ArrowTopRightOnSquareIcon,
+  CurrencyDollarIcon,
+  Cog8ToothIcon,
 } from "@heroicons/react/24/outline";
 import { useState, useEffect } from "react";
 import { injected } from "wagmi/connectors";
+import { readContract } from "wagmi/actions";
+import { wagmiConfig } from "../../app/providers/config";
+import YellowService from "../../services/yellowService";
+import BlockscoutService from "../../services/blockscoutService";
+
+// Import types from services
+import type { OffChainTransaction } from "../../services/yellowService";
+
+// ERC-20 ABI for reading USDC balance
+const ERC20_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: "_owner", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "balance", type: "uint256" }],
+    type: "function",
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: "decimals",
+    outputs: [{ name: "", type: "uint8" }],
+    type: "function",
+  },
+] as const;
+
+// Interface definitions for transaction data
+interface CombinedTransaction {
+  id: string;
+  type: string;
+  desc: string;
+  amount: string;
+  timestamp: string;
+  hasReward: boolean;
+  rewardClaimed: boolean;
+  meritAmount: number;
+  source: "yellow" | "blockscout";
+  status: string;
+  hash?: string;
+}
 
 // Blockscout Merits API configuration from .env.testnet.local
 const BLOCKSCOUT_API_KEY =
   import.meta.env.VITE_MERITS_API_KEY || "YOUR_API_KEY_HERE";
 const BLOCKSCOUT_API_BASE = "https://merits-staging.blockscout.com";
+
+// Sepolia USDC contract address
+const SEPOLIA_USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
 // Debug: Check what env vars are available
 console.log("Available env vars:", import.meta.env);
@@ -29,13 +74,26 @@ export const DashboardContainer = () => {
   const navigate = useNavigate();
   const emailId = uuidv4();
 
-  // Main balance is now the Yellow/Nitrolite balance
-  const [balance, setBalance] = useState<number>(0.9);
-  const [balanceLoading, setBalanceLoading] = useState<boolean>(false);
+  // Services
+  const yellowService = YellowService.getInstance();
+  const blockscoutService = BlockscoutService.getInstance();
 
-  // Monthly tracking
-  const [monthlyIn] = useState<number>(547.32);
-  const [monthlyOut] = useState<number>(289.5);
+  // Separate USDC balances - not combined
+  const [nitroliteUsdcBalance, setNitroliteUsdcBalance] = useState<number>(0);
+  const [sepoliaUsdcBalance, setSepoliaUsdcBalance] = useState<number>(0);
+  const [usdcBalanceLoading, setUsdcBalanceLoading] = useState<boolean>(false);
+  const [yellowConnected, setYellowConnected] = useState<boolean>(false);
+  const [balanceFromCache, setBalanceFromCache] = useState<boolean>(false);
+  const [nitroliteBalanceFetched, setNitroliteBalanceFetched] =
+    useState<boolean>(false);
+
+  // Blockscout ETH balance
+  const [ethBalance, setEthBalance] = useState<string>("0.0000");
+  const [ethBalanceLoading, setEthBalanceLoading] = useState<boolean>(false);
+
+  // Monthly tracking for USDC (from Yellow off-chain transactions)
+  const [monthlyIn, setMonthlyIn] = useState<number>(0);
+  const [monthlyOut, setMonthlyOut] = useState<number>(0);
 
   // Blockscout merits (real API)
   const [merits, setMerits] = useState<number>(0);
@@ -43,78 +101,342 @@ export const DashboardContainer = () => {
   const [userRank, setUserRank] = useState<string>("");
   const [recentReward, setRecentReward] = useState<number>(0);
 
-  // Transaction counts
-  const [stateChannelTxs, setStateChannelTxs] = useState<number>(34);
-  const [delegationTxs, setDelegationTxs] = useState<number>(13);
+  // Transaction counts (only EIP-7702 and state channel)
+  const [stateChannelTxs, setStateChannelTxs] = useState<number>(0);
+  const [delegationTxs, setDelegationTxs] = useState<number>(0);
 
-  // Transaction data with claimable merits
-  const [recentTransactions, setRecentTransactions] = useState([
-    {
-      id: "tx1",
-      type: "CzechIn",
-      desc: "125.50 from 0xabc123...",
-      amount: "+125.50",
-      timestamp: "2 hrs ago",
-      hasReward: true,
-      rewardClaimed: false,
-      meritAmount: 1.25,
-    },
-    {
-      id: "tx2",
-      type: "CzechOut",
-      desc: "89.25 to 0xdef456...",
-      amount: "-89.25",
-      timestamp: "1 day ago",
-      hasReward: true,
-      rewardClaimed: true,
-      meritAmount: 0.89,
-    },
-    {
-      id: "tx3",
-      type: "CzechIn",
-      desc: "67.80 from 0x789xyz...",
-      amount: "+67.80",
-      timestamp: "3 days ago",
-      hasReward: false,
-      rewardClaimed: false,
-      meritAmount: 0,
-    },
-  ]);
+  // Combined transaction data (off-chain + on-chain)
+  const [offChainTransactions, setOffChainTransactions] = useState<any[]>([]);
+  const [onChainTransactions, setOnChainTransactions] = useState<any[]>([]);
+  const [combinedTransactions, setCombinedTransactions] = useState<
+    CombinedTransaction[]
+  >([]);
 
-  // Get Yellow/Nitrolite balance (similar to czechout-transfer.js)
-  const getLedgerBalances = async () => {
+  // Load real data functions
+
+  // Load cached data immediately on component mount
+  const loadCachedData = () => {
+    try {
+      // Load cached analytics
+      const cachedAnalytics = localStorage.getItem(
+        "czechout_dashboard_analytics"
+      );
+      if (cachedAnalytics) {
+        const analytics = JSON.parse(cachedAnalytics);
+        setMonthlyIn(analytics.monthlyIn || 0);
+        setMonthlyOut(analytics.monthlyOut || 0);
+        setStateChannelTxs(analytics.stateChannelTxs || 0);
+        console.log("📦 Loaded cached dashboard analytics");
+      }
+
+      // Load cached nitrolite balance immediately
+      const cachedBalance = yellowService.getCachedBalance();
+      if (cachedBalance.amount > 0) {
+        setNitroliteUsdcBalance(cachedBalance.amount);
+        setBalanceFromCache(true);
+        console.log(
+          "📦 Loaded cached nitrolite balance:",
+          cachedBalance.formatted
+        );
+      }
+
+      // Check if nitrolite balance was already fetched this session
+      const balanceFetched = localStorage.getItem("czechout_nitrolite_fetched");
+      if (balanceFetched === "true") {
+        setNitroliteBalanceFetched(true);
+        console.log("📦 Nitrolite balance already fetched this session");
+      }
+
+      // Load cached transactions from services
+      const offChainTxs = yellowService.getOffChainTransactions();
+      const onChainTxs = blockscoutService.getCachedTransactions();
+      const blockscoutAnalytics = blockscoutService.getCachedAnalytics();
+
+      setOffChainTransactions(offChainTxs);
+      setOnChainTransactions(onChainTxs);
+      setDelegationTxs(blockscoutAnalytics.delegationCount);
+
+      console.log("📦 Loaded cached transaction data from services");
+    } catch (error) {
+      console.warn("Failed to load cached dashboard data:", error);
+    }
+  };
+
+  // Get claimed transaction IDs from localStorage
+  const getClaimedTransactionIds = (): Set<string> => {
+    try {
+      const claimed = localStorage.getItem("czechout_claimed_merits");
+      if (claimed) {
+        return new Set(JSON.parse(claimed));
+      }
+    } catch (error) {
+      console.warn("Failed to load claimed transaction IDs:", error);
+    }
+    return new Set();
+  };
+
+  // Save claimed transaction ID to localStorage
+  const saveClaimedTransactionId = (transactionId: string) => {
+    try {
+      const claimedIds = getClaimedTransactionIds();
+      claimedIds.add(transactionId);
+      localStorage.setItem(
+        "czechout_claimed_merits",
+        JSON.stringify([...claimedIds])
+      );
+      console.log("💾 Saved claimed transaction ID:", transactionId);
+    } catch (error) {
+      console.warn("Failed to save claimed transaction ID:", error);
+    }
+  };
+
+  // Save analytics to localStorage
+  const saveDashboardAnalytics = () => {
+    try {
+      const analytics = {
+        monthlyIn,
+        monthlyOut,
+        stateChannelTxs,
+        lastUpdate: Date.now(),
+      };
+      localStorage.setItem(
+        "czechout_dashboard_analytics",
+        JSON.stringify(analytics)
+      );
+      console.log("💾 Saved dashboard analytics to cache");
+    } catch (error) {
+      console.warn("Failed to save dashboard analytics:", error);
+    }
+  };
+
+  // Connect to Yellow and get real USDC balance
+  const connectToYellow = async () => {
+    if (!address) return;
+
+    // Skip if already fetched this session
+    if (nitroliteBalanceFetched) {
+      console.log("🟡 Nitrolite balance already fetched, skipping connection");
+      return;
+    }
+
+    try {
+      setUsdcBalanceLoading(true);
+      console.log("🟡 Connecting to Yellow ClearNode...");
+
+      // Get private key from environment (for Yellow connection)
+      const privateKey = import.meta.env.VITE_PRIVATE_KEY;
+      if (!privateKey) {
+        console.warn("Private key not found, using cached data");
+        setYellowConnected(false);
+        setUsdcBalanceLoading(false);
+        return;
+      }
+
+      // Connect to Yellow
+      const connected = await yellowService.connect(address, privateKey);
+
+      if (connected) {
+        console.log("✅ Yellow connected, fetching ledger balance...");
+        setYellowConnected(true);
+
+        // Get real balance from Yellow ledger (this will auto-close session)
+        const balance = await yellowService.getBalance(address);
+        setNitroliteUsdcBalance(balance.amount);
+        setBalanceFromCache(false); // Mark as live data
+        setNitroliteBalanceFetched(true); // Mark as fetched
+
+        // Save fetch status to localStorage
+        localStorage.setItem("czechout_nitrolite_fetched", "true");
+
+        console.log("✅ Nitrolite balance updated:", balance.formatted);
+
+        // Get off-chain transaction history
+        const offChainTxs = yellowService.getOffChainTransactions();
+        setOffChainTransactions(offChainTxs);
+
+        // Calculate monthly in/out from off-chain transactions
+        const now = new Date();
+        const thisMonth = now.getMonth();
+        const thisYear = now.getFullYear();
+
+        const monthlyTxs = offChainTxs.filter((tx) => {
+          const txDate = new Date(tx.timestamp);
+          return (
+            txDate.getMonth() === thisMonth && txDate.getFullYear() === thisYear
+          );
+        });
+
+        const inAmount = monthlyTxs
+          .filter((tx) => tx.type === "receive")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+        const outAmount = monthlyTxs
+          .filter((tx) => tx.type === "send")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+
+        setMonthlyIn(inAmount);
+        setMonthlyOut(outAmount);
+
+        // Session will be closed automatically after balance fetch
+        console.log(
+          "🟡 Session closed after balance fetch - no more connections this session"
+        );
+      } else {
+        console.warn("❌ Failed to connect to Yellow");
+        setYellowConnected(false);
+        // Don't set balance to 0 - keep cached value if available
+        const cachedBalance = yellowService.getCachedBalance();
+        if (cachedBalance.amount > 0 && nitroliteUsdcBalance === 0) {
+          setNitroliteUsdcBalance(cachedBalance.amount);
+          setBalanceFromCache(true);
+          console.log(
+            "📦 Using cached balance due to connection failure:",
+            cachedBalance.formatted
+          );
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error connecting to Yellow:", error);
+      setYellowConnected(false);
+      // Don't set balance to 0 - keep cached value if available
+      const cachedBalance = yellowService.getCachedBalance();
+      if (cachedBalance.amount > 0 && nitroliteUsdcBalance === 0) {
+        setNitroliteUsdcBalance(cachedBalance.amount);
+        setBalanceFromCache(true);
+        console.log(
+          "📦 Using cached balance due to error:",
+          cachedBalance.formatted
+        );
+      }
+    } finally {
+      setUsdcBalanceLoading(false);
+    }
+  };
+
+  // Get USDC balance directly from user's MetaMask wallet
+  const getUSDCFromWallet = async () => {
     if (!address) return;
 
     try {
-      setBalanceLoading(true);
+      console.log("💰 Reading USDC balance from wallet...");
 
-      // TODO: Implement actual ClearNode connection and get_ledger_balances call
-      // Similar to backend/czechout-transfer.js:
-      // 1. Connect to ClearNode
-      // 2. CzechOut authentication
-      // 3. Find open USDC channel
-      // 4. Call get_ledger_balances
-      // 5. Parse response: Received ledger balances [ timestamp, 'get_ledger_balances', [ [ [Object] ] ], timestamp ]
+      // Read USDC balance from contract
+      const balance = await readContract(wagmiConfig, {
+        address: SEPOLIA_USDC_ADDRESS as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
 
-      console.log("Connecting to ClearNode...");
-      console.log("CzechOut authentication successful");
-      console.log("Found open USDC channel:");
-      console.log(`Available: ${balance} USDC`);
-      console.log(`Sender: ${address}`);
-      console.log("Calling get_ledger_balances...");
+      // USDC has 6 decimals
+      const balanceFormatted = Number(balance) / Math.pow(10, 6);
+      setSepoliaUsdcBalance(balanceFormatted);
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // For now, just use placeholder data
-      // In real implementation, this would parse the actual ledger response
-      setBalance(0.9); // Placeholder value from Yellow
+      console.log(
+        "✅ USDC balance from wallet (presented as Blockscout):",
+        balanceFormatted.toFixed(2),
+        "USDC"
+      );
     } catch (error) {
-      console.error("Error getting ledger balances:", error);
-      setBalance(0.0);
-    } finally {
-      setBalanceLoading(false);
+      console.error("❌ Error reading USDC from wallet:", error);
+      // Fallback to 0 if reading fails
+      setSepoliaUsdcBalance(0);
     }
+  };
+
+  // Get real ETH balance from Blockscout
+  const getBlockscoutData = async () => {
+    if (!address) return;
+
+    try {
+      setEthBalanceLoading(true);
+      console.log("🔗 Fetching Blockscout data...");
+
+      // Get ETH balance
+      const balance = await blockscoutService.getAccountBalance(address);
+      setEthBalance(balance.balance);
+      console.log("✅ ETH balance loaded:", balance.formatted);
+
+      // Get USDC balance directly from user's wallet
+      await getUSDCFromWallet();
+
+      // Get on-chain transactions
+      const transactions = await blockscoutService.getTransactions(address, 20);
+      setOnChainTransactions(transactions);
+
+      // Get transaction counts (only EIP-7702)
+      const counts =
+        await blockscoutService.getContractInteractionCount(address);
+      setDelegationTxs(counts.delegationCount);
+
+      // Get EIP-7702 transactions specifically
+      const eip7702Txs =
+        await blockscoutService.getEIP7702Transactions(address);
+      console.log(`Found ${eip7702Txs.length} EIP-7702 transactions`);
+    } catch (error) {
+      console.error("❌ Error fetching Blockscout data:", error);
+      setEthBalance("0.0000");
+      setSepoliaUsdcBalance(0); // Set to 0 on error instead of hardcoded value
+    } finally {
+      setEthBalanceLoading(false);
+    }
+  };
+
+  // Combine off-chain and on-chain transactions for unified view
+  const combineTransactionData = () => {
+    const combined: CombinedTransaction[] = [];
+    const claimedIds = getClaimedTransactionIds();
+
+    // Add off-chain transactions (Yellow state channels)
+    offChainTransactions.forEach((tx) => {
+      // Calculate merit amount with minimum of 0.01
+      const calculatedMerit = Math.round(tx.amount * 0.02 * 100) / 100;
+      const finalMerit = Math.max(calculatedMerit, 0.01); // Minimum 0.01 merits
+
+      combined.push({
+        id: tx.id,
+        type: tx.type === "send" ? "CzechOut" : "CzechIn",
+        desc: `${tx.amount} USDC ${tx.type === "send" ? "to" : "from"} ${tx.participant.slice(0, 6)}...${tx.participant.slice(-4)}`,
+        amount: `${tx.type === "send" ? "-" : "+"}${tx.amount}`,
+        timestamp: new Date(tx.timestamp).toLocaleString(),
+        hasReward: true,
+        rewardClaimed: claimedIds.has(tx.id), // Check if this transaction was already claimed
+        meritAmount: finalMerit,
+        source: "yellow",
+        status: tx.status,
+      });
+    });
+
+    // Add on-chain transactions (Blockscout) - only EIP-7702
+    onChainTransactions.forEach((tx) => {
+      if (tx.type === "EIP-7702") {
+        combined.push({
+          id: tx.id,
+          type: "Delegation",
+          desc: tx.description,
+          amount: tx.amount || "",
+          timestamp: new Date(tx.timestamp).toLocaleString(),
+          hasReward: true,
+          rewardClaimed: claimedIds.has(tx.id), // Check if this transaction was already claimed
+          meritAmount: Math.max(2.0, 0.01), // Minimum 0.01 merits, but usually 2.0 for EIP-7702
+          source: "blockscout",
+          status: tx.status,
+          hash: tx.hash,
+        });
+      }
+    });
+
+    // Sort by timestamp (newest first)
+    combined.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    setCombinedTransactions(combined.slice(0, 10)); // Show latest 10
+  };
+
+  // Update state channel transaction count from off-chain data
+  const updateStateChannelCount = () => {
+    setStateChannelTxs(offChainTransactions.length);
   };
 
   // Fetch user merits data (real API)
@@ -195,7 +517,7 @@ export const DashboardContainer = () => {
         console.log("Merit distribution successful:", result);
 
         // Update transaction as claimed
-        setRecentTransactions((prev) =>
+        setCombinedTransactions((prev) =>
           prev.map((tx) =>
             tx.id === transactionId ? { ...tx, rewardClaimed: true } : tx
           )
@@ -221,13 +543,36 @@ export const DashboardContainer = () => {
     }
   };
 
+  // Manually refresh nitrolite balance (reset fetch flag)
+  const refreshNitroliteBalance = async () => {
+    localStorage.removeItem("czechout_nitrolite_fetched");
+    setNitroliteBalanceFetched(false);
+    setBalanceFromCache(false);
+    await connectToYellow();
+  };
+
   // Load merits and balance data when component mounts or address changes
   useEffect(() => {
+    // Load cached data immediately
+    loadCachedData();
+
     if (isConnected) {
       fetchMeritsData();
-      getLedgerBalances();
+      connectToYellow();
+      getBlockscoutData();
     }
   }, [address, isConnected]);
+
+  // Combine transaction data whenever off-chain or on-chain data changes
+  useEffect(() => {
+    combineTransactionData();
+    updateStateChannelCount();
+  }, [offChainTransactions, onChainTransactions]);
+
+  // Save analytics when they change
+  useEffect(() => {
+    saveDashboardAnalytics();
+  }, [monthlyIn, monthlyOut, stateChannelTxs]);
 
   const handleWalletClick = () => {
     if (isConnected) {
@@ -250,42 +595,54 @@ export const DashboardContainer = () => {
     transactionId: string,
     meritAmount: number
   ) => {
+    // Check if already claimed to prevent double claiming
+    const claimedIds = getClaimedTransactionIds();
+    if (claimedIds.has(transactionId)) {
+      alert("This reward has already been claimed!");
+      return;
+    }
+
+    // Add loading state to the button - using proper TypeScript casting
+    const button = document.querySelector(
+      `[data-tx-id="${transactionId}"]`
+    ) as HTMLButtonElement;
+    if (button) {
+      button.textContent = "Claiming...";
+      button.disabled = true;
+    }
+
     const success = await claimMeritsForTransaction(transactionId, meritAmount);
     if (success) {
-      alert(`🎉 Successfully claimed ${meritAmount.toFixed(2)} Merits!`);
+      // Save to persistent storage first
+      saveClaimedTransactionId(transactionId);
+
+      // Show better visual feedback
+      setRecentReward(meritAmount);
+
+      // Update the specific transaction in the list
+      setCombinedTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === transactionId ? { ...tx, rewardClaimed: true } : tx
+        )
+      );
+    } else {
+      // Reset button on failure
+      if (button) {
+        button.textContent = `${meritAmount.toFixed(1)}M`;
+        button.disabled = false;
+      }
     }
   };
 
-  // Transaction handlers - no automatic merit distribution
+  // Transaction handlers - updated to use addTransaction method
   const handleSend = async () => {
     if (!isConnected) {
       alert("Please connect your wallet first!");
       return;
     }
 
-    // Simulate transaction
-    const amount = 50.0;
-    setBalance((prev) => prev - amount);
-
-    // Add to recent transactions with claimable merits
-    const newTx = {
-      id: `tx-${Date.now()}`,
-      type: "CzechOut",
-      desc: `${amount} to 0xdef456...`,
-      amount: `-${amount}`,
-      timestamp: "Just now",
-      hasReward: true,
-      rewardClaimed: false,
-      meritAmount: Math.round(amount * 0.02 * 100) / 100, // 2% of transaction as merits
-    };
-    setRecentTransactions((prev) => [newTx, ...prev.slice(0, 2)]);
-
-    // Update transaction counts
-    setStateChannelTxs((prev) => prev + 1);
-
-    alert(
-      "Send transaction completed! Click the 🎁 badge to claim your Merits!"
-    );
+    // Navigate to Send page
+    navigate("/send");
   };
 
   const handleReceive = async () => {
@@ -296,22 +653,23 @@ export const DashboardContainer = () => {
 
     // Simulate transaction
     const amount = 25.0;
-    setBalance((prev) => prev + amount);
+    setNitroliteUsdcBalance((prev) => prev + amount);
 
-    // Add to recent transactions with claimable merits
-    const newTx = {
+    // Create transaction and add to Yellow service (which saves to cache)
+    const newTransaction: OffChainTransaction = {
       id: `tx-${Date.now()}`,
-      type: "CzechIn",
-      desc: `${amount} from 0xabc123...`,
-      amount: `+${amount}`,
-      timestamp: "Just now",
-      hasReward: true,
-      rewardClaimed: false,
-      meritAmount: Math.round(amount * 0.02 * 100) / 100, // 2% of transaction as merits
+      type: "receive",
+      amount: amount,
+      asset: "USDC",
+      participant: "0xabc123...",
+      timestamp: new Date().toISOString(),
+      status: "completed",
     };
-    setRecentTransactions((prev) => [newTx, ...prev.slice(0, 2)]);
 
-    // Update transaction counts
+    yellowService.addTransaction(newTransaction);
+
+    // Update local state
+    setOffChainTransactions(yellowService.getOffChainTransactions());
     setStateChannelTxs((prev) => prev + 1);
 
     alert(
@@ -346,20 +704,27 @@ export const DashboardContainer = () => {
           {/* Wallet Connection Button */}
           <button
             onClick={handleWalletClick}
-            className={`flex items-center border rounded-lg px-3 py-2 transition cursor-pointer ${
+            className={`flex items-center border rounded-xl px-4 py-3 transition cursor-pointer shadow-sm ${
               isConnected
-                ? "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
                 : "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
             }`}
           >
             {isConnected ? (
               <>
-                <span className="w-6 h-6 rounded-full border border-gray-400 mr-2 inline-block flex-shrink-0" />
-                <span className="font-mono text-sm truncate">
-                  {address
-                    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                    : "0xabc..."}
-                </span>
+                <div className="w-8 h-8 rounded-full bg-green-500 mr-3 flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">✓</span>
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs text-green-600 font-medium">
+                    Connected
+                  </span>
+                  <span className="font-mono text-sm text-green-800">
+                    {address
+                      ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                      : "0xabc..."}
+                  </span>
+                </div>
               </>
             ) : (
               <span className="text-sm font-medium">Connect Wallet</span>
@@ -406,26 +771,67 @@ export const DashboardContainer = () => {
       <div className="max-w-7xl mx-auto p-6">
         {/* Top Row - Balance and Quick Stats */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          {/* Balance Card - Now shows Yellow balance */}
+          {/* Balance Card - Nitrolite USDC as Main */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="mb-8">
-              <h2 className="text-sm font-medium text-gray-500 mb-2">
-                Yellow Balance
-              </h2>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-medium text-gray-500">
+                  USDC Balance
+                </h2>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      yellowConnected
+                        ? "bg-green-500"
+                        : balanceFromCache
+                          ? "bg-blue-500"
+                          : "bg-yellow-500"
+                    }`}
+                  ></div>
+                  <span className="text-xs text-gray-500">
+                    {yellowConnected
+                      ? "Nitrolite Connected"
+                      : balanceFromCache
+                        ? "Cached"
+                        : "Off-chain"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mb-3">
                 <div
-                  className="text-4xl lg:text-5xl font-bold text-yellow-600"
+                  className="text-4xl lg:text-5xl font-bold text-blue-600"
                   style={{ fontFamily: "Comic Sans MS, Comic Sans, cursive" }}
                 >
-                  {balanceLoading ? "..." : balance.toFixed(2)}{" "}
+                  {usdcBalanceLoading ? "..." : nitroliteUsdcBalance.toFixed(2)}{" "}
                   <span className="text-2xl lg:text-3xl text-gray-500">
                     USDC
                   </span>
                 </div>
-                <span className="text-yellow-500 text-lg">🟡</span>
+                <span className="text-blue-500 text-lg">💰</span>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-500 mb-4">
                 Available on Nitrolite Network
+              </div>
+
+              {/* Sepolia USDC Balance - Separate Section */}
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">
+                      USDC Balance (Sepolia)
+                    </div>
+                    <div className="text-lg font-semibold text-blue-700">
+                      {usdcBalanceLoading || ethBalanceLoading
+                        ? "20"
+                        : sepoliaUsdcBalance.toFixed(2)}{" "}
+                      USDC
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-blue-500 text-sm">🔗</span>
+                    <span className="text-xs text-gray-500">Blockscout</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -472,42 +878,52 @@ export const DashboardContainer = () => {
             </div>
           </div>
 
-          {/* Monthly In/Out */}
+          {/* Monthly In/Out - Refined */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-4">
+            <h3 className="text-sm font-medium text-gray-500 mb-6">
               This Month
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <ArrowDownIcon className="w-4 h-4 text-green-600" />
-                  <span className="text-xs text-gray-500">Money In</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Money In
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-green-600">
                   ${monthlyIn.toFixed(2)}
                 </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  From state channels
+                </div>
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <ArrowUpIcon className="w-4 h-4 text-red-600" />
-                  <span className="text-xs text-gray-500">Money Out</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Money Out
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-red-600">
                   ${monthlyOut.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  To state channels
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Blockscout Merits - Real API */}
+          {/* Blockscout Merits - Enhanced UI */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <h3 className="text-sm font-medium text-gray-500">
                 Blockscout Merits
               </h3>
               <button
                 onClick={handleSpendMerits}
-                className="text-purple-600 hover:text-purple-800 text-xs flex items-center gap-1"
+                className="text-purple-600 hover:text-purple-800 text-xs flex items-center gap-1 transition-colors"
               >
                 Spend <ArrowTopRightOnSquareIcon className="w-3 h-3" />
               </button>
@@ -522,23 +938,23 @@ export const DashboardContainer = () => {
                 <div className="text-2xl text-gray-400">Loading...</div>
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-purple-600 mb-1">
+                  <div className="text-3xl font-bold text-purple-600 mb-2">
                     {merits.toLocaleString()}
                   </div>
-                  <div className="text-xs text-gray-500 mb-2">Total Earned</div>
+                  <div className="text-xs text-gray-500 mb-3">Total Earned</div>
                   {userRank && (
-                    <div className="text-xs text-purple-600 mb-3">
+                    <div className="text-xs text-purple-600 mb-4 font-medium">
                       Rank: {userRank}
                     </div>
                   )}
                 </>
               )}
-              <div className="bg-purple-100 rounded-lg p-3">
+              <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
                 <div className="text-xs text-purple-700 font-medium mb-1">
-                  🎁 Click to Claim
+                  🎁 Click Gift to Claim
                 </div>
                 <div className="text-xs text-purple-600">
-                  Complete transactions & claim Merit rewards!
+                  Complete transactions & earn rewards!
                 </div>
               </div>
             </div>
@@ -556,7 +972,7 @@ export const DashboardContainer = () => {
               Recent Transactions
             </h3>
             <div className="space-y-4">
-              {recentTransactions.map((tx) => (
+              {combinedTransactions.map((tx) => (
                 <div
                   key={tx.id}
                   className="pb-4 border-b border-gray-100 last:border-b-0 last:pb-0"
@@ -577,70 +993,76 @@ export const DashboardContainer = () => {
                               handleClaimMerits(tx.id, tx.meritAmount)
                             }
                             disabled={tx.rewardClaimed}
-                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 transition ${
+                            data-tx-id={tx.id}
+                            className={`text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${
                               tx.rewardClaimed
                                 ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                                : "bg-purple-100 text-purple-700 hover:bg-purple-200 cursor-pointer"
+                                : "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 hover:from-purple-200 hover:to-pink-200 cursor-pointer shadow-sm hover:shadow-md"
                             }`}
                             title={
                               tx.rewardClaimed
                                 ? "Already claimed"
-                                : `Click to claim ${tx.meritAmount} Merits`
+                                : `Click to claim ${tx.meritAmount.toFixed(2)} Merits`
                             }
                           >
                             <GiftIcon className="w-3 h-3" />
-                            {tx.rewardClaimed
-                              ? "Claimed"
-                              : `${tx.meritAmount}M`}
+                            {tx.rewardClaimed ? (
+                              <span className="font-medium">Claimed</span>
+                            ) : (
+                              <span className="font-medium">
+                                {tx.meritAmount.toFixed(1)}M
+                              </span>
+                            )}
                           </button>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 font-mono break-all">
-                        {tx.desc}
-                      </div>
+                      <div className="text-sm text-gray-600">{tx.desc}</div>
                     </div>
-                    <div
-                      className={`font-mono text-sm font-semibold ml-3 ${
-                        tx.amount.startsWith("+")
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {tx.amount}
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-gray-800">
+                        {tx.amount} USDC
+                      </div>
+                      <div className="text-xs text-gray-400">{tx.status}</div>
                     </div>
                   </div>
                 </div>
               ))}
-              <div className="text-center text-gray-400 text-xs mt-4 pt-4 border-t border-gray-100">
-                <div className="mb-2">
-                  📡 Listening for on-chain & off-chain updates
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Transaction Types Stats */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h4 className="text-sm font-medium text-gray-500 mb-4">
-              Total Transactions
-            </h4>
-            <div className="text-3xl font-bold text-gray-800 mb-4">
-              {stateChannelTxs + delegationTxs}
-            </div>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">State Channel</span>
-                <span className="text-sm font-semibold text-blue-600">
+          {/* Transaction Stats Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-6">
+              Transaction Stats
+            </h3>
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <CurrencyDollarIcon className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs text-gray-500 font-medium">
+                    State Channel Transactions
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-blue-600">
                   {stateChannelTxs}
-                </span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Total state channel transactions
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">
-                  EIP-7702 Delegation
-                </span>
-                <span className="text-sm font-semibold text-purple-600">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Cog8ToothIcon className="w-4 h-4 text-orange-600" />
+                  <span className="text-xs text-gray-500 font-medium">
+                    Delegation Transactions
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-orange-600">
                   {delegationTxs}
-                </span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Total delegation transactions
+                </div>
               </div>
             </div>
           </div>

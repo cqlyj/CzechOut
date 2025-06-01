@@ -38,14 +38,14 @@ test("Simple Email Proof happy path", async ({ page }) => {
 
   await test.step("Click on next button naviages to mint page", async () => {
     await page.click("#nextButton");
-    await expect(page).toHaveURL(stepsMeta[StepKind.mintNft].path);
+    await expect(page).toHaveURL(stepsMeta[StepKind.mintNFT].path);
     await expect(
       page.getByRole("heading", {
-        name: stepsMeta[StepKind.mintNft].title,
+        name: stepsMeta[StepKind.mintNFT].title,
       }),
     ).toBeVisible();
     await expect(
-      page.getByText(stepsMeta[StepKind.mintNft].description),
+      page.getByText(stepsMeta[StepKind.mintNFT].description),
     ).toBeVisible();
   });
 

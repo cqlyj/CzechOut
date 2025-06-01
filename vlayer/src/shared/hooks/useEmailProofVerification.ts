@@ -66,11 +66,11 @@ export const useEmailProofVerification = () => {
     data: proofHash,
     error: callProverError,
   } = useCallProver({
-    address: import.meta.env.VITE_PROVER_ADDRESS,
+    address: "0xB6a356Dc48A09A5753E4723411D31f31aa72774B",
     proverAbi: proverSpec.abi,
     functionName: "main",
-    gasLimit: Number(import.meta.env.VITE_GAS_LIMIT),
-    chainId: chain?.id,
+    gasLimit: 1000000,
+    chainId: 11155111,
   });
 
   if (callProverError) {
@@ -117,6 +117,7 @@ export const useEmailProofVerification = () => {
         dnsResolverUrl: import.meta.env.VITE_DNS_SERVICE_URL,
         token: import.meta.env.VITE_VLAYER_API_TOKEN,
       });
+      console.log("email", email);
       await callProver([email]);
     } catch (error) {
       setPreverifyError(error as Error);
