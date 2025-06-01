@@ -30,7 +30,7 @@ contract WebProofVerifier is Verifier {
         return walletToFaceVerified[_wallet];
     }
 
-    function setFaceVerified(address _wallet) external {
-        walletToFaceVerified[_wallet] = false;
+    function setFaceVerified(address _wallet, bool _verified) external {
+        walletToFaceVerified[_wallet] = _verified;
     }
 }

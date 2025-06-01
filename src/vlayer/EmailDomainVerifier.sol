@@ -41,7 +41,7 @@ contract EmailDomainVerifier is Verifier {
         return walletToEmailVerified[_wallet];
     }
 
-    function setEmailVerified(address _wallet) external {
-        walletToEmailVerified[_wallet] = false;
+    function setEmailVerified(address _wallet, bool _verified) external {
+        walletToEmailVerified[_wallet] = _verified;
     }
 }
