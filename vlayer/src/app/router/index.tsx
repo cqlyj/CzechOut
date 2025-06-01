@@ -8,6 +8,7 @@ import { WelcomePage } from "../../pages/welcome";
 import { RegisterContainer } from "../../pages/register";
 import { Update7702Page } from "../../pages/update7702";
 import { SuccessContainer } from "../../pages/success";
+import { SendMoneyContainer } from "../../pages/sendMoney";
 
 const Router = () => {
   return (
@@ -16,6 +17,7 @@ const Router = () => {
         <Routes>
           {/* Full-screen routes without modal wrapper */}
           <Route path="/dashboard" element={<DashboardContainer />} />
+          <Route path="/send" element={<SendMoneyContainer />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/app/register" element={<RegisterContainer />} />
           <Route path="/account-setup" element={<Update7702Page />} />
