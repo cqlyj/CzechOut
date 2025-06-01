@@ -9,6 +9,7 @@ import { RegisterContainer } from "../../pages/register";
 import { Update7702Page } from "../../pages/update7702";
 import { SuccessContainer } from "../../pages/success";
 import { SendMoneyContainer } from "../../pages/sendMoney";
+import { ReceiveMoneyContainer } from "../../pages/receiveMoney";
 
 const Router = () => {
   return (
@@ -18,6 +19,7 @@ const Router = () => {
           {/* Full-screen routes without modal wrapper */}
           <Route path="/dashboard" element={<DashboardContainer />} />
           <Route path="/send" element={<SendMoneyContainer />} />
+          <Route path="/receive" element={<ReceiveMoneyContainer />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/app/register" element={<RegisterContainer />} />
           <Route path="/account-setup" element={<Update7702Page />} />
