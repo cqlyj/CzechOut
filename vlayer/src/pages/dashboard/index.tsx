@@ -1,4 +1,10 @@
-import { useAccount, useDisconnect, useConnect } from "wagmi";
+import {
+  useAccount,
+  useDisconnect,
+  useConnect,
+  useWalletClient,
+  usePublicClient,
+} from "wagmi";
 import { v4 as uuidv4 } from "uuid";
 import { useNavigate } from "react-router";
 import {
@@ -9,18 +15,24 @@ import {
   ArrowTopRightOnSquareIcon,
   CurrencyDollarIcon,
   Cog8ToothIcon,
+  PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
 import { useState, useEffect } from "react";
 import { injected } from "wagmi/connectors";
 import { readContract } from "wagmi/actions";
 import { wagmiConfig } from "../../app/providers/config";
+import { parseAbi, parseUnits, formatUnits } from "viem";
 import YellowService from "../../services/yellowService";
 import BlockscoutService from "../../services/blockscoutService";
 
 // Import types from services
 import type { OffChainTransaction } from "../../services/yellowService";
 
-// ERC-20 ABI for reading USDC balance
+// Contract addresses from .note.md
+const MOCK_USDC_ADDRESS = "0x3C01AB5Dc4737C1e0D0Ef5FCb49dB401373870d1";
+const DELEGATION_ADDRESS = "0xf746D07609aF6E1410086F7A62a00D0a5EA1cdA0";
+
+// ERC-20 ABI for USDC operations
 const ERC20_ABI = [
   {
     constant: true,
@@ -35,6 +47,37 @@ const ERC20_ABI = [
     name: "decimals",
     outputs: [{ name: "", type: "uint8" }],
     type: "function",
+  },
+  {
+    constant: false,
+    inputs: [
+      { name: "_to", type: "address" },
+      { name: "_value", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    type: "function",
+  },
+] as const;
+
+// Delegation contract ABI for EIP-7702 transfers
+const DELEGATION_ABI = [
+  {
+    type: "function",
+    name: "transferUSDC",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getUSDCBalance",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
   },
 ] as const;
 
@@ -71,6 +114,8 @@ export const DashboardContainer = () => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { connect } = useConnect();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const navigate = useNavigate();
   const emailId = uuidv4();
 
@@ -81,11 +126,20 @@ export const DashboardContainer = () => {
   // Separate USDC balances - not combined
   const [nitroliteUsdcBalance, setNitroliteUsdcBalance] = useState<number>(0);
   const [sepoliaUsdcBalance, setSepoliaUsdcBalance] = useState<number>(0);
+  const [mockUsdcBalance, setMockUsdcBalance] = useState<number>(0); // MockUSDC balance
   const [usdcBalanceLoading, setUsdcBalanceLoading] = useState<boolean>(false);
   const [yellowConnected, setYellowConnected] = useState<boolean>(false);
   const [balanceFromCache, setBalanceFromCache] = useState<boolean>(false);
   const [nitroliteBalanceFetched, setNitroliteBalanceFetched] =
     useState<boolean>(false);
+
+  // EIP-7702 Transfer states
+  const [transferAmount, setTransferAmount] = useState<string>("1");
+  const [transferTo, setTransferTo] = useState<string>("");
+  const [isTransferring, setIsTransferring] = useState<boolean>(false);
+  const [transferError, setTransferError] = useState<string>("");
+  const [transferSuccess, setTransferSuccess] = useState<string>("");
+  const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
 
   // Blockscout ETH balance
   const [ethBalance, setEthBalance] = useState<string>("0.0000");
@@ -551,6 +605,126 @@ export const DashboardContainer = () => {
     await connectToYellow();
   };
 
+  // Load MockUSDC balance via delegation contract
+  const getMockUSDCBalance = async () => {
+    console.log("🔍 getMockUSDCBalance called with:", {
+      address,
+      publicClient: !!publicClient,
+    });
+
+    if (!address || !publicClient) {
+      console.log("❌ Missing address or publicClient:", {
+        address,
+        publicClient: !!publicClient,
+      });
+      return;
+    }
+
+    try {
+      console.log(
+        "🔍 Fetching MockUSDC balance directly from token contract..."
+      );
+      console.log("📍 Contract address:", MOCK_USDC_ADDRESS);
+      console.log("👤 User address:", address);
+
+      // Get the balance (using 18 decimals - standard ERC-20)
+      const balance = await publicClient.readContract({
+        address: MOCK_USDC_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [address],
+      });
+
+      console.log("🔢 Raw balance:", balance);
+      const balanceFormatted = Number(formatUnits(balance as bigint, 18)); // Hard-coded 18 decimals
+      console.log("💰 Formatted balance:", balanceFormatted);
+
+      setMockUsdcBalance(balanceFormatted);
+      console.log("✅ MockUSDC balance set to:", balanceFormatted);
+    } catch (error: any) {
+      console.error("❌ Error fetching MockUSDC balance:", error);
+      console.error("📊 Error details:", {
+        message: error.message,
+        code: error.code,
+        data: error.data,
+      });
+    }
+  };
+
+  // Perform EIP-7702 delegation transfer
+  const performDelegationTransfer = async () => {
+    if (!address || !walletClient || !publicClient) {
+      setTransferError("Wallet not connected");
+      return;
+    }
+
+    if (!transferTo || !transferAmount) {
+      setTransferError("Please enter recipient address and amount");
+      return;
+    }
+
+    if (Number(transferAmount) <= 0) {
+      setTransferError("Amount must be greater than 0");
+      return;
+    }
+
+    if (Number(transferAmount) > mockUsdcBalance) {
+      setTransferError("Insufficient balance");
+      return;
+    }
+
+    setIsTransferring(true);
+    setTransferError("");
+    setTransferSuccess("");
+
+    try {
+      console.log("🚀 Starting EIP-7702 delegation transfer...");
+      console.log("From:", address);
+      console.log("To:", transferTo);
+      console.log("Amount:", transferAmount, "USDC");
+
+      // Convert amount to proper units (6 decimals for USDC)
+      const amountInWei = parseUnits(transferAmount, 6);
+
+      // Call the delegation contract's transferUSDC function
+      const hash = await walletClient.writeContract({
+        address: DELEGATION_ADDRESS,
+        abi: DELEGATION_ABI,
+        functionName: "transferUSDC",
+        args: [transferTo as `0x${string}`, amountInWei],
+      });
+
+      console.log("📝 Transaction submitted:", hash);
+      setTransferSuccess(`Transfer initiated! Transaction: ${hash}`);
+
+      // Wait for confirmation
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      console.log("✅ EIP-7702 transfer confirmed!");
+      setTransferSuccess(
+        `✅ Successfully transferred ${transferAmount} USDC via EIP-7702!`
+      );
+
+      // Refresh balance
+      await getMockUSDCBalance();
+
+      // Reset form
+      setTransferAmount("1");
+      setTransferTo("");
+
+      // Close modal after delay
+      setTimeout(() => {
+        setShowTransferModal(false);
+        setTransferSuccess("");
+      }, 3000);
+    } catch (error: any) {
+      console.error("❌ Transfer failed:", error);
+      setTransferError(`Transfer failed: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   // Load merits and balance data when component mounts or address changes
   useEffect(() => {
     // Load cached data immediately
@@ -560,8 +734,16 @@ export const DashboardContainer = () => {
       fetchMeritsData();
       connectToYellow();
       getBlockscoutData();
+      getMockUSDCBalance(); // Load MockUSDC balance via delegation
     }
-  }, [address, isConnected]);
+  }, [address, isConnected, publicClient]);
+
+  // Separate useEffect to ensure MockUSDC balance is loaded when publicClient is ready
+  useEffect(() => {
+    if (isConnected && address && publicClient) {
+      getMockUSDCBalance();
+    }
+  }, [publicClient, isConnected, address]);
 
   // Combine transaction data whenever off-chain or on-chain data changes
   useEffect(() => {
@@ -802,13 +984,10 @@ export const DashboardContainer = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs text-gray-500 mb-1">
-                      USDC Balance (Sepolia)
+                      USDC Balance (Test Network)
                     </div>
                     <div className="text-lg font-semibold text-blue-700">
-                      {usdcBalanceLoading || ethBalanceLoading
-                        ? "20"
-                        : sepoliaUsdcBalance.toFixed(2)}{" "}
-                      USDC
+                      {mockUsdcBalance.toFixed(2)} USDC
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
