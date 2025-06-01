@@ -6,7 +6,7 @@ export const SendEmailContainer = () => {
   const { address } = useAccount();
   const emailId = uuidv4();
 
-  const subject = `Mint my domain NFT at address: ${address}`;
+  const subject = `Recover my PIN for wallet at address: ${address}`;
   const uniqueEmail = `${emailId}@proving.vlayer.xyz`;
 
   if (!address) {

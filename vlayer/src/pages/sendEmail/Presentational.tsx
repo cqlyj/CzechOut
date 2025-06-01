@@ -15,7 +15,7 @@ export const SendEmail = ({
         <InputWithCopy label="Subject" value={subject} />
       </div>
       <div className="mt-5 flex justify-center">
-        <NextButton path={`/collect-email?uniqueEmail=${uniqueEmail}`} />
+        <NextButton path={`/app/collectEmail?uniqueEmail=${uniqueEmail}`} />
       </div>
     </>
   );

@@ -4,6 +4,9 @@ export enum StepKind {
   accountSetup,
   dashboard,
   success,
+  sendEmail,
+  mintNFT,
+  collectEmail,
 }
 
 export type StepMeta = {
@@ -55,5 +58,29 @@ export const stepsMeta: Record<StepKind, StepMeta> = {
     description: "",
     index: 4,
     backUrl: "register",
+  },
+  [StepKind.sendEmail]: {
+    path: "sendEmail",
+    kind: StepKind.sendEmail,
+    title: "Reset PIN",
+    description: "Enter your email to reset your PIN",
+    index: 5,
+    backUrl: "dashboard",
+  },
+  [StepKind.mintNFT]: {
+    path: "mintNFT",
+    kind: StepKind.mintNFT,
+    title: "Mint NFT",
+    description: "Mint your domain NFT",
+    index: 6,
+    backUrl: "sendEmail",
+  },
+  [StepKind.collectEmail]: {
+    path: "collectEmail",
+    kind: StepKind.collectEmail,
+    title: "Collect Email",
+    description: "Verify your email to continue",
+    index: 7,
+    backUrl: "sendEmail",
   },
 };

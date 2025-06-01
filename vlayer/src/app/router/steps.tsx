@@ -22,6 +22,9 @@ export const stepComponents: StepComponentMap = {
   [StepKind.dashboard]: DashboardContainer,
   [StepKind.accountSetup]: Update7702Page,  
   [StepKind.success]: SuccessContainer,
+  [StepKind.sendEmail]: SendEmailContainer,
+  [StepKind.mintNFT]: MintNFTContainer,
+  [StepKind.collectEmail]: CollectEmailContainer,
 };
 
 // Create a complete step structure that combines metadata with components

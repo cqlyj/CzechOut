@@ -15,7 +15,7 @@ export const CollectEmailContainer = () => {
 
   useEffect(() => {
     if (emlFetched) {
-      void navigate(`/${getStepPath(StepKind.mintNft)}`);
+      void navigate(`/mintNFT`);
     }
   }, [emlFetched, navigate]);
 

@@ -655,6 +655,10 @@ export const DashboardContainer = () => {
     navigate("/receive");
   };
 
+  const handleResetPin = () => {
+    navigate("/sendEmail");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Bar */}
@@ -838,6 +842,7 @@ export const DashboardContainer = () => {
                 Receive
               </button>
               <button
+                onClick={handleResetPin}
                 disabled={!isConnected}
                 className={`py-4 px-6 rounded-xl text-lg font-medium transition shadow-sm ${
                   isConnected

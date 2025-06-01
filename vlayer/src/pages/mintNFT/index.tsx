@@ -9,6 +9,8 @@ export const MintNFTContainer = () => {
     useEmailProofVerification();
 
   const handleProving = () => {
+    console.log("start proving");
+    // console.log("emlFile", emlFile);
     if (emlFile) {
       void startProving(emlFile);
     }
