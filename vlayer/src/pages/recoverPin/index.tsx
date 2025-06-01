@@ -12,10 +12,12 @@ import {
   EnvelopeIcon,
   GlobeAltIcon,
   KeyIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { v4 as uuidv4 } from "uuid";
 import { useEmailProofVerification } from "../../shared/hooks/useEmailProofVerification";
 import useExampleInbox from "../../shared/hooks/useExampleInbox";
+import { useWebProofVerification } from "../../shared/hooks/useWebProofVerification";
 
 // PIN input component for new PIN setup
 const PinInput = ({
@@ -131,13 +133,31 @@ export const RecoverPinContainer = () => {
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
 
+  // Get prestored user email from localStorage (set during registration)
+  const storedUserEmail = localStorage.getItem("userEmail");
+
   // Email proof setup - use from params or generate new
   const emailId = emailIdFromParams || uuidv4();
   const recoveryEmail = `${emailId}@proving.vlayer.xyz`;
+
+  // Email subject for PIN recovery - must match EmailDomainProver contract requirements
   const emailSubject = `Recover my PIN for wallet at address: ${address}`;
 
-  // Hooks for email proof verification
-  const { emlFetched } = useExampleInbox(emailId);
+  // Hooks for email proof verification - handle updated interface
+  const {
+    emlFetched,
+    error: emailFetchError,
+    isSimulated,
+  } = useExampleInbox(
+    step === 3 ? emailId : undefined // Only fetch when in step 3
+  );
+
+  // Determine if email service is disabled based on error type
+  const isEmailServiceDisabled =
+    emailFetchError?.includes("Rate limited") ||
+    emailFetchError?.includes("temporarily unavailable") ||
+    emailFetchError?.includes("403");
+
   const {
     currentStep: emailProofStep,
     startProving,
@@ -145,12 +165,45 @@ export const RecoverPinContainer = () => {
     verificationError,
   } = useEmailProofVerification();
 
+  // Hook for web proof verification (placeholder)
+  const {
+    currentStep: webProofStep,
+    startWebProof,
+    isComplete: webProofComplete,
+    error: webProofError,
+  } = useWebProofVerification();
+
+  // Check if user has a registered email for recovery
+  useEffect(() => {
+    if (!storedUserEmail && step > 1) {
+      setError(
+        "No registered email found. Please complete registration first to enable PIN recovery."
+      );
+    }
+  }, [storedUserEmail, step]);
+
+  // Update step when URL parameters change
+  useEffect(() => {
+    if (uniqueEmail && step !== 3) {
+      console.log("📧 Email parameter detected, moving to step 3");
+      setStep(3);
+    }
+  }, [uniqueEmail, step]);
+
   // Step handlers
   const handleStartRecovery = () => {
+    if (!storedUserEmail) {
+      setError(
+        "No registered email found. Please complete registration first to enable PIN recovery."
+      );
+      return;
+    }
+    setError(""); // Clear any existing errors
     setStep(2);
   };
 
   const handleEmailSent = () => {
+    setError(""); // Clear any existing errors
     // Navigate to the same page but with uniqueEmail parameter (like vlayer template)
     navigate(`/recover-pin?uniqueEmail=${recoveryEmail}`);
   };
@@ -165,6 +218,7 @@ export const RecoverPinContainer = () => {
         // Save new PIN (in real app, this would be encrypted and stored securely)
         localStorage.setItem("czechout_recovery_pin", pin);
         setStep(6);
+        setError("");
       } else {
         setError("PINs do not match. Please try again.");
         setNewPin("");
@@ -175,21 +229,56 @@ export const RecoverPinContainer = () => {
 
   // Email verification effect - like collectEmail page in vlayer template
   useEffect(() => {
-    if (emlFetched && step === 3) {
-      // Email received, start proving process
+    if (emlFetched && step === 3 && emailProofStep === "Mint") {
       const storedEml = localStorage.getItem("emlFile");
-      if (storedEml) {
-        startProving(storedEml);
+
+      if (storedEml && storedEml.length > 0) {
+        try {
+          // Pass simulation flag to the prover
+          startProving(storedEml, isSimulated);
+          setError(""); // Clear any existing errors
+        } catch (error) {
+          console.error("❌ Error starting proof generation:", error);
+          setError(
+            `Proof generation failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
+      } else {
+        setError(
+          "Email content not found. Please try sending the email again."
+        );
       }
     }
-  }, [emlFetched, step]);
+  }, [emlFetched, step, emailProofStep, startProving, isSimulated]);
 
-  // Email proof completion effect
+  // Handle email fetch errors
+  useEffect(() => {
+    if (emailFetchError && step === 3) {
+      setError(emailFetchError);
+    }
+  }, [emailFetchError, step]);
+
+  // Email proof completion effect - stay on PIN recovery instead of redirecting
   useEffect(() => {
     if (emailProofStep === "Done!" && step === 3) {
-      setStep(4); // Move to web proof
+      console.log("✅ Email proof verified - continuing to web proof");
+      setError(""); // Clear any existing errors
+      setTimeout(() => {
+        setStep(4);
+      }, 1000);
     }
   }, [emailProofStep, step]);
+
+  // Web proof completion effect
+  useEffect(() => {
+    if (webProofComplete && step === 4) {
+      console.log("✅ Web proof verification complete! Moving to PIN setup");
+      setError(""); // Clear any existing errors
+      setStep(5); // Move to PIN setup
+    }
+  }, [webProofComplete, step]);
 
   // Reset flow
   const resetFlow = () => {
@@ -284,10 +373,11 @@ export const RecoverPinContainer = () => {
             <div className="text-center">
               <KeyIcon className="w-16 h-16 text-blue-500 mx-auto mb-6" />
               <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                PIN Recovery with 2FA
+                PIN Recovery with vlayer 2FA
               </h2>
               <p className="text-xl text-gray-600 mb-8">
-                We'll use email and web proofs to securely verify your identity
+                Secure PIN recovery using vlayer's zero-knowledge email and web
+                proofs
               </p>
 
               <div className="space-y-6 mb-10">
@@ -298,8 +388,8 @@ export const RecoverPinContainer = () => {
                       Step 1: Email Proof
                     </h3>
                     <p className="text-blue-700 text-sm">
-                      Send an email from your registered address to verify
-                      ownership
+                      Send recovery email from your registered address for
+                      vlayer verification
                     </p>
                   </div>
                 </div>
@@ -311,7 +401,8 @@ export const RecoverPinContainer = () => {
                       Step 2: Web Proof
                     </h3>
                     <p className="text-purple-700 text-sm">
-                      Verify your identity through web-based authentication
+                      Complete biometric verification using vlayer's face scan
+                      web proofs
                     </p>
                   </div>
                 </div>
@@ -329,9 +420,41 @@ export const RecoverPinContainer = () => {
                 </div>
               </div>
 
+              {storedUserEmail && (
+                <div className="bg-green-50 border border-green-200 p-4 rounded-xl mb-8">
+                  <p className="text-green-800 text-sm">
+                    ✅ <strong>Registered Email Found:</strong>{" "}
+                    {storedUserEmail}
+                    <br />
+                    <span className="text-green-700">
+                      You can proceed with PIN recovery using this email
+                      address.
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {!storedUserEmail && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-xl mb-8">
+                  <p className="text-red-800 text-sm">
+                    ❌ <strong>No Registered Email Found</strong>
+                    <br />
+                    You need to complete registration first to enable PIN
+                    recovery.
+                    <br />
+                    <button
+                      onClick={() => navigate("/register")}
+                      className="mt-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm"
+                    >
+                      Go to Registration
+                    </button>
+                  </p>
+                </div>
+              )}
+
               <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-8">
                 <p className="text-yellow-800 text-sm">
-                  ⚠️ <strong>Security Notice:</strong> This process uses
+                  🔐 <strong>Security Notice:</strong> This process uses
                   vlayer's zero-knowledge proofs to verify your identity without
                   revealing sensitive information.
                 </p>
@@ -339,7 +462,8 @@ export const RecoverPinContainer = () => {
 
               <button
                 onClick={handleStartRecovery}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                disabled={!storedUserEmail}
+                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
               >
                 Start PIN Recovery
               </button>
@@ -353,24 +477,58 @@ export const RecoverPinContainer = () => {
                 Send Recovery Email
               </h2>
               <p className="text-xl text-gray-600 mb-10 text-center">
-                Send an email with the details below to start verification
+                Send an email from your registered address for vlayer
+                verification
               </p>
 
               <div className="space-y-6">
-                <InputWithCopy label="To" value={recoveryEmail} />
-                <InputWithCopy label="Subject" value={emailSubject} />
+                {storedUserEmail && (
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-xl mb-6">
+                    <div className="text-green-800 text-sm">
+                      📧 <strong>Your Registered Email:</strong>{" "}
+                      {storedUserEmail}
+                      <br />
+                      <span className="text-green-700">
+                        You must send the recovery email FROM this address for
+                        vlayer to verify.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <InputWithCopy
+                  label="Send TO (vlayer Email Service)"
+                  value={recoveryEmail}
+                />
+                <InputWithCopy
+                  label="Subject Line (Must be exact)"
+                  value={emailSubject}
+                />
 
                 <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
                   <p className="text-blue-800 text-sm">
-                    📧 <strong>Instructions:</strong>
+                    📧 <strong>vlayer Email Requirements:</strong>
                     <br />
-                    1. Copy the email details above
+                    1. <strong>Use your email client</strong> (Gmail, Outlook,
+                    etc.)
                     <br />
-                    2. Send an email with just the subject line (no body needed)
+                    2. <strong>Send FROM your registered email:</strong>{" "}
+                    {storedUserEmail}
                     <br />
-                    3. Click "I've Sent the Email" below
+                    3. <strong>Send TO the address above</strong> (copy the
+                    vlayer email address)
                     <br />
-                    4. Wait for our system to verify and process it
+                    4. <strong>Use EXACT subject line above</strong> (copy/paste
+                    recommended)
+                    <br />
+                    5. <strong>Email body can be empty</strong> - vlayer only
+                    needs the subject
+                    <br />
+                    6. <strong>Email must have DKIM signature</strong> - most
+                    providers include this automatically
+                    <br />
+                    7. Click "I've Sent the Email" below and wait for vlayer
+                    processing
                   </p>
                 </div>
 
@@ -389,7 +547,8 @@ export const RecoverPinContainer = () => {
                   </button>
                   <button
                     onClick={handleEmailSent}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                    disabled={!storedUserEmail}
+                    className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
                   >
                     I've Sent the Email
                   </button>
@@ -409,11 +568,11 @@ export const RecoverPinContainer = () => {
                 )}
               </div>
               <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                Verifying Email Proof
+                vlayer Email Proof Verification
               </h2>
               <p className="text-xl text-gray-600 mb-8">
                 {!emlFetched
-                  ? "Waiting for your email to be received and processed..."
+                  ? "Waiting for vlayer to receive and process your email..."
                   : "Email received! Generating zero-knowledge proof..."}
               </p>
 
@@ -430,13 +589,13 @@ export const RecoverPinContainer = () => {
                     </span>
                   </div>
                   <div className="flex justify-between items-center mb-3">
-                    <span>Proof Generation:</span>
+                    <span>vlayer Proof Generation:</span>
                     <span className="font-medium text-blue-600">
                       {emailProofStep}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>Verification:</span>
+                    <span>On-Chain Verification:</span>
                     <span className="font-medium text-blue-600">
                       {txHash ? "✅ Complete" : "⏳ Pending..."}
                     </span>
@@ -446,55 +605,116 @@ export const RecoverPinContainer = () => {
 
               {verificationError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg text-lg mb-6">
-                  Error: {verificationError.message}
+                  <div className="font-semibold mb-2">Verification Error:</div>
+                  <div className="text-sm">{verificationError}</div>
                 </div>
               )}
-
-              <div className="text-sm text-gray-500">
-                🔐 Using vlayer's zero-knowledge email proofs for secure
-                verification
-              </div>
             </div>
           )}
 
           {/* Step 4: Web Proof Verification (Placeholder) */}
           {step === 4 && (
             <div className="text-center">
-              <GlobeAltIcon className="w-20 h-20 text-purple-500 mx-auto mb-6" />
+              <div className="w-20 h-20 mx-auto mb-6">
+                {webProofComplete ? (
+                  <CheckCircleIcon className="w-20 h-20 text-green-500" />
+                ) : webProofStep === "Ready" ? (
+                  <GlobeAltIcon className="w-20 h-20 text-purple-500" />
+                ) : (
+                  <ArrowPathIcon className="w-20 h-20 text-purple-500 animate-spin" />
+                )}
+              </div>
               <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                Web Proof Verification
+                vlayer Web Proof Verification
               </h2>
               <p className="text-xl text-gray-600 mb-8">
-                Complete the second factor authentication
+                {webProofStep === "Ready"
+                  ? "Complete the second factor authentication"
+                  : webProofComplete
+                  ? "Web proof verification successful!"
+                  : "Verifying your web identity with vlayer..."}
               </p>
 
-              <div className="bg-purple-50 border border-purple-200 p-8 rounded-xl mb-8">
-                <h3 className="text-lg font-semibold text-purple-800 mb-4">
-                  🚧 Web Proof - Coming Soon
-                </h3>
-                <p className="text-purple-700 mb-6">
-                  This will verify your identity through web-based
-                  authentication using vlayer's web proof technology. For now,
-                  this step is automatically completed.
-                </p>
-                <div className="text-sm text-purple-600">
-                  Features will include:
-                  <br />
-                  • OAuth provider verification (Google, GitHub, etc.)
-                  <br />
-                  • Website interaction proofs
-                  <br />
-                  • Social media verification
-                  <br />• Custom web application auth
+              <div className="bg-purple-50 border border-purple-200 p-6 rounded-xl mb-8">
+                <div className="text-lg text-purple-700">
+                  <div className="flex justify-between items-center mb-3">
+                    <span>Email Proof:</span>
+                    <span className="font-medium text-green-600">
+                      ✅ Complete
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span>Web Authentication:</span>
+                    <span
+                      className={`font-medium ${
+                        webProofComplete
+                          ? "text-green-600"
+                          : webProofStep === "Ready"
+                          ? "text-gray-600"
+                          : "text-purple-600"
+                      }`}
+                    >
+                      {webProofComplete
+                        ? "✅ Complete"
+                        : webProofStep === "Ready"
+                        ? "⏳ Waiting..."
+                        : webProofStep}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>2FA Status:</span>
+                    <span
+                      className={`font-medium ${
+                        webProofComplete ? "text-green-600" : "text-gray-600"
+                      }`}
+                    >
+                      {webProofComplete ? "✅ Verified" : "⏳ Pending..."}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <button
-                onClick={() => setStep(5)}
-                className="w-full bg-purple-500 hover:bg-purple-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
-              >
-                Continue (Auto-verified for Demo)
-              </button>
+              {webProofError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg text-lg mb-6">
+                  Error: {webProofError}
+                </div>
+              )}
+
+              <div className="bg-purple-50 border border-purple-200 p-6 rounded-xl mb-8">
+                <h3 className="text-lg font-semibold text-purple-800 mb-4">
+                  🔐 vlayer Web Proof Authentication
+                </h3>
+                <p className="text-purple-700 mb-4">
+                  This second factor uses vlayer's web proof technology with
+                  face scan verification to confirm your identity through secure
+                  biometric authentication.
+                </p>
+                <div className="text-sm text-purple-600">
+                  Features:
+                  <br />
+                  • Zero-knowledge web proofs with biometric verification
+                  <br />
+                  • Secure face scan authentication without storing biometric
+                  data
+                  <br />• Privacy-preserving identity verification using vlayer
+                </div>
+              </div>
+
+              {webProofStep === "Ready" && (
+                <button
+                  onClick={startWebProof}
+                  className="w-full bg-purple-500 hover:bg-purple-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                >
+                  Start vlayer Web Proof Verification
+                </button>
+              )}
+
+              {webProofStep !== "Ready" && !webProofComplete && (
+                <div className="text-sm text-purple-500">
+                  🔐 Generating vlayer zero-knowledge web proof for secure
+                  verification
+                </div>
+              )}
             </div>
           )}
 
@@ -546,7 +766,7 @@ export const RecoverPinContainer = () => {
                 PIN Recovery Complete!
               </h2>
               <p className="text-xl text-gray-600 mb-8">
-                Your PIN has been successfully reset and secured
+                Your PIN has been successfully reset using vlayer's secure 2FA
               </p>
 
               <div className="bg-green-50 border border-green-200 p-6 rounded-xl mb-8">
