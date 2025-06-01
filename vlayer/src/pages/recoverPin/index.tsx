@@ -1,0 +1,599 @@
+import { useAccount, useConnect } from "wagmi";
+import { useNavigate, useSearchParams } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { injected } from "wagmi/connectors";
+import {
+  ChevronLeftIcon,
+  CameraIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon,
+  ClipboardDocumentIcon,
+  EnvelopeIcon,
+  GlobeAltIcon,
+  KeyIcon,
+} from "@heroicons/react/24/outline";
+import { v4 as uuidv4 } from "uuid";
+import { useEmailProofVerification } from "../../shared/hooks/useEmailProofVerification";
+import useExampleInbox from "../../shared/hooks/useExampleInbox";
+
+// PIN input component for new PIN setup
+const PinInput = ({
+  onComplete,
+  disabled,
+  title = "Enter PIN",
+}: {
+  onComplete: (pin: string) => void;
+  disabled: boolean;
+  title?: string;
+}) => {
+  const [pin, setPin] = useState(["", "", "", "", "", ""]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const handleChange = (index: number, value: string) => {
+    if (!/^\d?$/.test(value)) return;
+
+    const newPin = [...pin];
+    newPin[index] = value;
+    setPin(newPin);
+
+    // Move to next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Check if PIN is complete
+    if (newPin.every((digit) => digit !== "")) {
+      onComplete(newPin.join(""));
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  useEffect(() => {
+    // Reset PIN when title changes (for confirm step)
+    setPin(["", "", "", "", "", ""]);
+  }, [title]);
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold text-center text-gray-700">
+        {title}
+      </h3>
+      <div className="flex gap-3 justify-center">
+        {pin.map((digit, index) => (
+          <input
+            key={index}
+            ref={(el) => (inputRefs.current[index] = el)}
+            type="password"
+            inputMode="numeric"
+            pattern="\d*"
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleChange(index, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(index, e)}
+            disabled={disabled}
+            className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none disabled:bg-gray-100 text-black"
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Input with copy functionality
+const InputWithCopy = ({ label, value }: { label: string; value: string }) => {
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(value);
+    alert(`${label} copied to clipboard!`);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <div className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+        <span className="flex-1 font-mono text-sm text-gray-800 break-all">
+          {value}
+        </span>
+        <button
+          onClick={copyToClipboard}
+          className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs flex items-center gap-1 shrink-0"
+        >
+          <ClipboardDocumentIcon className="w-3 h-3" />
+          Copy
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export const RecoverPinContainer = () => {
+  const { address, isConnected } = useAccount();
+  const { connect } = useConnect();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Get email ID from URL params (for email collection step)
+  const uniqueEmail = searchParams.get("uniqueEmail");
+  const emailIdFromParams = uniqueEmail?.split("@")[0];
+
+  // Component state - determine step based on URL params
+  const [step, setStep] = useState(() => {
+    if (uniqueEmail) return 3; // If we have uniqueEmail param, we're in email collection mode
+    return 1; // Otherwise start from beginning
+  });
+
+  const [error, setError] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+
+  // Email proof setup - use from params or generate new
+  const emailId = emailIdFromParams || uuidv4();
+  const recoveryEmail = `${emailId}@proving.vlayer.xyz`;
+  const emailSubject = `Recover my PIN for wallet at address: ${address}`;
+
+  // Hooks for email proof verification
+  const { emlFetched } = useExampleInbox(emailId);
+  const {
+    currentStep: emailProofStep,
+    startProving,
+    txHash,
+    verificationError,
+  } = useEmailProofVerification();
+
+  // Step handlers
+  const handleStartRecovery = () => {
+    setStep(2);
+  };
+
+  const handleEmailSent = () => {
+    // Navigate to the same page but with uniqueEmail parameter (like vlayer template)
+    navigate(`/recover-pin?uniqueEmail=${recoveryEmail}`);
+  };
+
+  const handleNewPinComplete = (pin: string) => {
+    if (!newPin) {
+      setNewPin(pin);
+      setError("");
+    } else {
+      setConfirmPin(pin);
+      if (pin === newPin) {
+        // Save new PIN (in real app, this would be encrypted and stored securely)
+        localStorage.setItem("czechout_recovery_pin", pin);
+        setStep(6);
+      } else {
+        setError("PINs do not match. Please try again.");
+        setNewPin("");
+        setConfirmPin("");
+      }
+    }
+  };
+
+  // Email verification effect - like collectEmail page in vlayer template
+  useEffect(() => {
+    if (emlFetched && step === 3) {
+      // Email received, start proving process
+      const storedEml = localStorage.getItem("emlFile");
+      if (storedEml) {
+        startProving(storedEml);
+      }
+    }
+  }, [emlFetched, step]);
+
+  // Email proof completion effect
+  useEffect(() => {
+    if (emailProofStep === "Done!" && step === 3) {
+      setStep(4); // Move to web proof
+    }
+  }, [emailProofStep, step]);
+
+  // Reset flow
+  const resetFlow = () => {
+    setStep(1);
+    setError("");
+    setNewPin("");
+    setConfirmPin("");
+    navigate("/recover-pin"); // Go back to start without params
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md w-full mx-4">
+          <h1 className="text-2xl font-bold text-gray-800 text-center mb-6">
+            Connect Wallet to Recover PIN
+          </h1>
+          <button
+            onClick={() => connect({ connector: injected() })}
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-medium"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-2xl mx-auto flex justify-between items-center">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ChevronLeftIcon className="w-4 h-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Recover PIN</h1>
+          <div className="w-16"></div> {/* Spacer */}
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-2xl mx-auto p-8">
+        {/* Progress Indicator */}
+        <div className="flex justify-center mb-12">
+          <div className="flex items-center gap-3">
+            {[1, 2, 3, 4, 5, 6].map((stepNum) => (
+              <div key={stepNum} className="flex items-center">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step >= stepNum
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {stepNum}
+                </div>
+                {stepNum < 6 && (
+                  <div
+                    className={`w-8 h-1 ${
+                      step > stepNum ? "bg-blue-500" : "bg-gray-200"
+                    }`}
+                  ></div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Step Labels */}
+        <div className="flex justify-center mb-8">
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              {step === 1 && "Recovery Information"}
+              {step === 2 && "Send Recovery Email"}
+              {step === 3 && "Email Proof Verification"}
+              {step === 4 && "Web Proof Verification"}
+              {step === 5 && "Set New PIN"}
+              {step === 6 && "Recovery Complete"}
+            </p>
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-12">
+          {/* Step 1: Recovery Information */}
+          {step === 1 && (
+            <div className="text-center">
+              <KeyIcon className="w-16 h-16 text-blue-500 mx-auto mb-6" />
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                PIN Recovery with 2FA
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                We'll use email and web proofs to securely verify your identity
+              </p>
+
+              <div className="space-y-6 mb-10">
+                <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <EnvelopeIcon className="w-8 h-8 text-blue-600" />
+                  <div className="text-left">
+                    <h3 className="font-semibold text-blue-800">
+                      Step 1: Email Proof
+                    </h3>
+                    <p className="text-blue-700 text-sm">
+                      Send an email from your registered address to verify
+                      ownership
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                  <GlobeAltIcon className="w-8 h-8 text-purple-600" />
+                  <div className="text-left">
+                    <h3 className="font-semibold text-purple-800">
+                      Step 2: Web Proof
+                    </h3>
+                    <p className="text-purple-700 text-sm">
+                      Verify your identity through web-based authentication
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                  <KeyIcon className="w-8 h-8 text-green-600" />
+                  <div className="text-left">
+                    <h3 className="font-semibold text-green-800">
+                      Step 3: New PIN
+                    </h3>
+                    <p className="text-green-700 text-sm">
+                      Set a new 6-digit PIN for your account
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-8">
+                <p className="text-yellow-800 text-sm">
+                  ⚠️ <strong>Security Notice:</strong> This process uses
+                  vlayer's zero-knowledge proofs to verify your identity without
+                  revealing sensitive information.
+                </p>
+              </div>
+
+              <button
+                onClick={handleStartRecovery}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+              >
+                Start PIN Recovery
+              </button>
+            </div>
+          )}
+
+          {/* Step 2: Send Recovery Email */}
+          {step === 2 && (
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">
+                Send Recovery Email
+              </h2>
+              <p className="text-xl text-gray-600 mb-10 text-center">
+                Send an email with the details below to start verification
+              </p>
+
+              <div className="space-y-6">
+                <InputWithCopy label="To" value={recoveryEmail} />
+                <InputWithCopy label="Subject" value={emailSubject} />
+
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+                  <p className="text-blue-800 text-sm">
+                    📧 <strong>Instructions:</strong>
+                    <br />
+                    1. Copy the email details above
+                    <br />
+                    2. Send an email with just the subject line (no body needed)
+                    <br />
+                    3. Click "I've Sent the Email" below
+                    <br />
+                    4. Wait for our system to verify and process it
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg text-lg">
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleEmailSent}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                  >
+                    I've Sent the Email
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Email Proof Verification */}
+          {step === 3 && (
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-6">
+                {emlFetched ? (
+                  <CheckCircleIcon className="w-20 h-20 text-green-500" />
+                ) : (
+                  <ArrowPathIcon className="w-20 h-20 text-blue-500 animate-spin" />
+                )}
+              </div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                Verifying Email Proof
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                {!emlFetched
+                  ? "Waiting for your email to be received and processed..."
+                  : "Email received! Generating zero-knowledge proof..."}
+              </p>
+
+              <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl mb-8">
+                <div className="text-lg text-blue-700">
+                  <div className="flex justify-between items-center mb-3">
+                    <span>Email Received:</span>
+                    <span
+                      className={`font-medium ${
+                        emlFetched ? "text-green-600" : "text-yellow-600"
+                      }`}
+                    >
+                      {emlFetched ? "✅ Yes" : "⏳ Waiting..."}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span>Proof Generation:</span>
+                    <span className="font-medium text-blue-600">
+                      {emailProofStep}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Verification:</span>
+                    <span className="font-medium text-blue-600">
+                      {txHash ? "✅ Complete" : "⏳ Pending..."}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {verificationError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg text-lg mb-6">
+                  Error: {verificationError.message}
+                </div>
+              )}
+
+              <div className="text-sm text-gray-500">
+                🔐 Using vlayer's zero-knowledge email proofs for secure
+                verification
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Web Proof Verification (Placeholder) */}
+          {step === 4 && (
+            <div className="text-center">
+              <GlobeAltIcon className="w-20 h-20 text-purple-500 mx-auto mb-6" />
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                Web Proof Verification
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                Complete the second factor authentication
+              </p>
+
+              <div className="bg-purple-50 border border-purple-200 p-8 rounded-xl mb-8">
+                <h3 className="text-lg font-semibold text-purple-800 mb-4">
+                  🚧 Web Proof - Coming Soon
+                </h3>
+                <p className="text-purple-700 mb-6">
+                  This will verify your identity through web-based
+                  authentication using vlayer's web proof technology. For now,
+                  this step is automatically completed.
+                </p>
+                <div className="text-sm text-purple-600">
+                  Features will include:
+                  <br />
+                  • OAuth provider verification (Google, GitHub, etc.)
+                  <br />
+                  • Website interaction proofs
+                  <br />
+                  • Social media verification
+                  <br />• Custom web application auth
+                </div>
+              </div>
+
+              <button
+                onClick={() => setStep(5)}
+                className="w-full bg-purple-500 hover:bg-purple-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+              >
+                Continue (Auto-verified for Demo)
+              </button>
+            </div>
+          )}
+
+          {/* Step 5: Set New PIN */}
+          {step === 5 && (
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">
+                Set New PIN
+              </h2>
+              <p className="text-xl text-gray-600 mb-10 text-center">
+                {!newPin
+                  ? "Enter your new 6-digit PIN"
+                  : "Confirm your new PIN"}
+              </p>
+
+              <div className="space-y-8">
+                <PinInput
+                  onComplete={handleNewPinComplete}
+                  disabled={false}
+                  title={!newPin ? "Enter New PIN" : "Confirm New PIN"}
+                />
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg text-center text-lg">
+                    {error}
+                  </div>
+                )}
+
+                <div className="bg-green-50 border border-green-200 p-6 rounded-xl">
+                  <div className="text-sm text-green-700 text-center">
+                    🔒 Your new PIN will be securely stored and encrypted
+                  </div>
+                </div>
+
+                {newPin && (
+                  <div className="text-center text-sm text-gray-500">
+                    ✅ First PIN entered. Please confirm by entering it again.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 6: Success */}
+          {step === 6 && (
+            <div className="text-center">
+              <CheckCircleIcon className="w-20 h-20 text-green-500 mx-auto mb-6" />
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                PIN Recovery Complete!
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                Your PIN has been successfully reset and secured
+              </p>
+
+              <div className="bg-green-50 border border-green-200 p-6 rounded-xl mb-8">
+                <div className="text-lg text-green-700 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Email Verification:</span>
+                    <span className="font-medium">✅ Complete</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Web Verification:</span>
+                    <span className="font-medium">✅ Complete</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>New PIN:</span>
+                    <span className="font-medium">✅ Set & Encrypted</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-8">
+                <p className="text-blue-800 text-sm">
+                  🔐 <strong>Security Summary:</strong>
+                  <br />
+                  Your identity was verified using vlayer's zero-knowledge
+                  proofs without exposing your private information. Your new PIN
+                  is encrypted and stored securely.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                >
+                  Back to Dashboard
+                </button>
+                <button
+                  onClick={resetFlow}
+                  className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-6 px-8 rounded-2xl font-medium text-xl shadow-lg"
+                >
+                  Reset Another PIN
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
