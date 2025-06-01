@@ -9,12 +9,10 @@ import { RegisterContainer } from "../../pages/register";
 import { Update7702Page } from "../../pages/update7702";
 import { SuccessContainer } from "../../pages/success";
 import { SendMoneyContainer } from "../../pages/sendMoney";
-<<<<<<< HEAD
 import { ReceiveMoneyContainer } from "../../pages/receiveMoney";
-=======
+import { RecoverPinContainer } from "../../pages/recoverPin";
 import { SendEmailContainer } from "../../pages/sendEmail";
 import { MintNFTContainer } from "../../pages/mintNFT";
->>>>>>> 99376efa03421b358f9ee715b49ebd8285eee8c7
 
 const Router = () => {
   return (
@@ -25,6 +23,7 @@ const Router = () => {
           <Route path="/dashboard" element={<DashboardContainer />} />
           <Route path="/send" element={<SendMoneyContainer />} />
           <Route path="/receive" element={<ReceiveMoneyContainer />} />
+          <Route path="/recover-pin" element={<RecoverPinContainer />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/app/register" element={<RegisterContainer />} />
           <Route path="/account-setup" element={<Update7702Page />} />
