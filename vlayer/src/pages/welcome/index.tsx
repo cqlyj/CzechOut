@@ -280,8 +280,8 @@ export const WelcomePage = () => {
               {
                 emoji: "👤",
                 step: "Prove Who You Are",
-                desc: "Face recognition + email verification. Simple biometric authentication that works anywhere.",
-                tech: "Email Proof + Web Recovery",
+                desc: "Transaction history + email verification. Simple identity verification using your blockchain activity patterns.",
+                tech: "Email Proof + Transaction History",
               },
               {
                 emoji: "🔢",
@@ -385,7 +385,7 @@ export const WelcomePage = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
               <span className="bg-white bg-opacity-20 px-4 py-2 rounded-full">
-                👤 Face
+                📊 Transaction History
               </span>
               <span className="text-white opacity-75">+</span>
               <span className="bg-white bg-opacity-20 px-4 py-2 rounded-full">
