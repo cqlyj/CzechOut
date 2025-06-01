@@ -11,9 +11,9 @@ import {
   useChain,
 } from "@vlayer/react";
 import { preverifyEmail } from "@vlayer/sdk";
-import proverSpec from "../../../../out/EmailDomainProver.sol/EmailDomainProver";
-import verifierSpec from "../../../../out/EmailDomainVerifier.sol/EmailDomainVerifier";
-import { AbiStateMutability, ContractFunctionArgs } from "viem";
+import proverArtifact from "../../../../out/EmailDomainProver.sol/EmailDomainProver.json";
+import verifierArtifact from "../../../../out/EmailDomainVerifier.sol/EmailDomainVerifier.json";
+import { AbiStateMutability, ContractFunctionArgs, Abi } from "viem";
 import { useNavigate } from "react-router";
 import debug from "debug";
 import {
@@ -26,6 +26,10 @@ import {
 import { ensureBalance } from "../lib/ethFaucet";
 
 const log = debug("vlayer:email-proof-verification");
+
+// Extract ABIs with proper typing
+const proverSpec = { abi: proverArtifact.abi as Abi };
+const verifierSpec = { abi: verifierArtifact.abi as Abi };
 
 enum ProofVerificationStep {
   MINT = "Mint",
@@ -40,7 +44,7 @@ export const useEmailProofVerification = () => {
   const { data: balance } = useBalance({ address });
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<ProofVerificationStep>(
-    ProofVerificationStep.MINT,
+    ProofVerificationStep.MINT
   );
 
   const {
@@ -55,7 +59,7 @@ export const useEmailProofVerification = () => {
   });
 
   const { chain, error: chainError } = useChain(
-    import.meta.env.VITE_CHAIN_NAME,
+    import.meta.env.VITE_CHAIN_NAME
   );
   if (chainError) {
     throw new UseChainError(chainError);
@@ -66,11 +70,11 @@ export const useEmailProofVerification = () => {
     data: proofHash,
     error: callProverError,
   } = useCallProver({
-    address: "0xB6a356Dc48A09A5753E4723411D31f31aa72774B",
+    address: import.meta.env.VITE_PROVER_ADDRESS,
     proverAbi: proverSpec.abi,
     functionName: "main",
-    gasLimit: 1000000,
-    chainId: 11155111,
+    gasLimit: Number(import.meta.env.VITE_GAS_LIMIT),
+    chainId: chain?.id,
   });
 
   if (callProverError) {
@@ -117,7 +121,6 @@ export const useEmailProofVerification = () => {
         dnsResolverUrl: import.meta.env.VITE_DNS_SERVICE_URL,
         token: import.meta.env.VITE_VLAYER_API_TOKEN,
       });
-      console.log("email", email);
       await callProver([email]);
     } catch (error) {
       setPreverifyError(error as Error);
@@ -137,7 +140,9 @@ export const useEmailProofVerification = () => {
       setCurrentStep(ProofVerificationStep.DONE);
       const proofArray = proof as unknown[];
       void navigate(
-        `/success?txHash=${txHash}&domain=${String(proofArray[3])}&recipient=${String(proofArray[2])}`,
+        `/success?txHash=${txHash}&domain=${String(
+          proofArray[3]
+        )}&recipient=${String(proofArray[2])}`
       );
     }
   }, [status]);
