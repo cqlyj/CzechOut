@@ -655,8 +655,14 @@ export const DashboardContainer = () => {
     navigate("/receive");
   };
 
-  const handleResetPin = () => {
-    navigate("/sendEmail");
+  const handleResetPin = async () => {
+    if (!isConnected) {
+      alert("Please connect your wallet first!");
+      return;
+    }
+
+    // Navigate to PIN recovery page
+    navigate("/recover-pin");
   };
 
   return (
