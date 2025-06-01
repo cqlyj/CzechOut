@@ -16,8 +16,8 @@ import { createWalletClient, http } from "viem";
 import { sepolia } from "viem/chains";
 
 // Contract addresses from .note.md
-const REGISTRY_ADDRESS = "0x081C0AF74DE93A30517aa9A5d9ae915d0070dFaD";
-const DELEGATION_ADDRESS = "0xeE7fE61ba80E9EB65BA36c025863B884c1606939";
+const REGISTRY_ADDRESS = "0x9469A68F08f692a7df72E6fE66674b4833657C96";
+const DELEGATION_ADDRESS = "0xf746D07609aF6E1410086F7A62a00D0a5EA1cdA0";
 
 // Registry ABI for the register function
 const REGISTRY_ABI = [
@@ -168,7 +168,7 @@ export const Update7702Page = () => {
       const authorization = await privateKeyWalletClient.signAuthorization({
         chainId: sepolia.id,
         contractAddress: DELEGATION_ADDRESS,
-        nonce: 0, // You might need to get the actual nonce
+        executor: "self",
       });
 
       console.log("✅ Authorization signed:", authorization);
