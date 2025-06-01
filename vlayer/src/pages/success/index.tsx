@@ -106,7 +106,9 @@ export const SuccessContainer = () => {
             <p className="text-2xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
               Your CzechOut account is now fully configured! You can now make
               secure transactions using just your{" "}
-              <span className="font-bold text-blue-600">face + PIN</span>{" "}
+              <span className="font-bold text-blue-600">
+                transaction history + PIN
+              </span>{" "}
               authentication.
             </p>
           </motion.div>
@@ -224,9 +226,9 @@ export const SuccessContainer = () => {
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto">
                   <span className="text-3xl">🎭</span>
                 </div>
-                <div className="font-bold text-xl">Face Recognition</div>
+                <div className="font-bold text-xl">Transaction History</div>
                 <div className="text-blue-100">
-                  Secure biometric authentication
+                  Secure blockchain-based authentication
                 </div>
               </div>
               <div className="space-y-3">
