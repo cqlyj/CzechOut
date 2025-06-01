@@ -272,7 +272,7 @@ export class YellowService {
             // Add small delay to ensure WebSocket is ready
             setTimeout(() => {
               this.ws?.send(authRequestMsg);
-            }, 100);
+            }, 500);
           } catch (error) {
             console.error("Error sending auth request:", error);
             reject(error);
