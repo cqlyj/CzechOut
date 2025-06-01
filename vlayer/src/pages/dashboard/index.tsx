@@ -651,30 +651,8 @@ export const DashboardContainer = () => {
       return;
     }
 
-    // Simulate transaction
-    const amount = 25.0;
-    setNitroliteUsdcBalance((prev) => prev + amount);
-
-    // Create transaction and add to Yellow service (which saves to cache)
-    const newTransaction: OffChainTransaction = {
-      id: `tx-${Date.now()}`,
-      type: "receive",
-      amount: amount,
-      asset: "USDC",
-      participant: "0xabc123...",
-      timestamp: new Date().toISOString(),
-      status: "completed",
-    };
-
-    yellowService.addTransaction(newTransaction);
-
-    // Update local state
-    setOffChainTransactions(yellowService.getOffChainTransactions());
-    setStateChannelTxs((prev) => prev + 1);
-
-    alert(
-      "Receive transaction completed! Click the 🎁 badge to claim your Merits!"
-    );
+    // Navigate to Receive page
+    navigate("/receive");
   };
 
   return (
