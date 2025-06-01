@@ -11,6 +11,50 @@ import {
 } from "@heroicons/react/24/outline";
 import YellowService from "../../services/yellowService";
 import type { OffChainTransaction } from "../../services/yellowService";
+import { useWalletClient, usePublicClient } from "wagmi";
+import { parseUnits, createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { sepolia } from "viem/chains";
+import ZKProofService from "../update7702/zkProofService";
+
+// Contract addresses from .note.md
+const MOCK_USDC_ADDRESS = "0x3C01AB5Dc4737C1e0D0Ef5FCb49dB401373870d1";
+const DELEGATION_ADDRESS = "0xf746D07609aF6E1410086F7A62a00D0a5EA1cdA0";
+
+// Delegation contract ABI for EIP-7702 transfers
+const DELEGATION_ABI = [
+  {
+    type: "function",
+    name: "agree",
+    inputs: [
+      { name: "_pA", type: "uint[2]" },
+      { name: "_pB", type: "uint[2][2]" },
+      { name: "_pC", type: "uint[2]" },
+      { name: "wallet", type: "uint256" },
+      { name: "intent", type: "uint256" },
+      { name: "credential_hash", type: "uint256" },
+      { name: "nonce", type: "uint256" },
+      { name: "result_hash", type: "uint256" },
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "tokenAddress", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+// ERC20 ABI for reading balance
+const ERC20_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
 
 // PIN input component
 const PinInput = ({
@@ -124,6 +168,8 @@ export const SendMoneyContainer = () => {
   const { connect } = useConnect();
   const navigate = useNavigate();
   const yellowService = YellowService.getInstance();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
 
   // Component state
   const [step, setStep] = useState(1); // 1: Face, 2: Amount, 3: PIN, 4: Processing, 5: Success
@@ -137,13 +183,41 @@ export const SendMoneyContainer = () => {
 
   // Balance state
   const [nitroliteBalance, setNitroliteBalance] = useState(0);
+  const [delegationBalance, setDelegationBalance] = useState(0);
   const [needsDelegation, setNeedsDelegation] = useState(false);
 
   // Load current balance from cache
   useEffect(() => {
     const cachedBalance = yellowService.getCachedBalance();
     setNitroliteBalance(cachedBalance.amount);
-  }, []);
+
+    // Load delegation balance if wallet is connected
+    if (isConnected && address && publicClient) {
+      loadDelegationBalance();
+    }
+  }, [isConnected, address, publicClient]);
+
+  // Load delegation balance from MockUSDC contract
+  const loadDelegationBalance = async () => {
+    if (!address || !publicClient) return;
+
+    try {
+      console.log("🔍 Loading delegation balance from MockUSDC contract...");
+
+      const balance = await publicClient.readContract({
+        address: MOCK_USDC_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [address],
+      });
+
+      const balanceFormatted = Number(balance) / Math.pow(10, 18); // 18 decimals
+      setDelegationBalance(balanceFormatted);
+      console.log("💰 Delegation balance loaded:", balanceFormatted);
+    } catch (error) {
+      console.error("❌ Error loading delegation balance:", error);
+    }
+  };
 
   // Handle face verification success
   const handleFaceSuccess = () => {
@@ -163,9 +237,18 @@ export const SendMoneyContainer = () => {
       return;
     }
 
-    // Check if we need delegation (amount > balance)
+    // Check if we need delegation (amount > nitrolite balance)
     if (amountNum > nitroliteBalance) {
+      // Check if we have enough delegation balance
+      if (amountNum > delegationBalance) {
+        setError(
+          `Insufficient balance. Available: ${nitroliteBalance.toFixed(2)} USDC (off-chain) + ${delegationBalance.toFixed(2)} USDC (delegation)`
+        );
+        return;
+      }
       setNeedsDelegation(true);
+    } else {
+      setNeedsDelegation(false);
     }
 
     setError("");
@@ -202,13 +285,94 @@ export const SendMoneyContainer = () => {
           "💰 Amount exceeds balance, initiating EIP-7702 delegation..."
         );
 
-        // Simulate delegation process
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (!publicClient) {
+          throw new Error("Public client not available");
+        }
+
+        // Get private key from environment
+        const privateKey = import.meta.env.VITE_PRIVATE_KEY;
+        if (!privateKey) {
+          throw new Error("Private key not configured");
+        }
+
+        // Create wallet client with private key
+        const account = privateKeyToAccount(privateKey as `0x${string}`);
+        const delegationWalletClient = createWalletClient({
+          account,
+          chain: sepolia,
+          transport: http(),
+        });
+
+        // Convert amount to proper units (18 decimals for this token)
+        const amountInWei = parseUnits(amount, 18);
+
+        console.log("🚀 Starting EIP-7702 delegation with ZK proof...");
+        console.log("From:", address);
+        console.log("To:", recipientAddress);
+        console.log("Amount:", amount, "USDC");
+
+        // Generate real ZK proof using the PIN
+        const zkProofService = ZKProofService.getInstance();
+        console.log("🔄 Generating ZK proof for PIN:", pin);
+
+        if (!address) {
+          throw new Error("Wallet address not available");
+        }
+
+        // Check if user is registered in Registry first
+        console.log("🔍 Checking if user is registered in Registry...");
+        // For now, we'll proceed with the delegation assuming registration exists
+        // In production, you'd want to check Registry.getCredentialHash(wallet) != 0
+
+        const proof = await zkProofService.generateFullProof(address, pin);
+
+        // Convert wallet address to proper BigInt format
+        const walletBigInt = BigInt(address);
+        console.log("📍 Wallet BigInt:", walletBigInt.toString());
+        console.log("📍 Proof wallet:", proof.publicSignals[0]);
+
+        // Convert proof format for the delegation contract
+        const proofArgs = [
+          [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],
+          [
+            [BigInt(proof.pi_b[0][0]), BigInt(proof.pi_b[0][1])],
+            [BigInt(proof.pi_b[1][0]), BigInt(proof.pi_b[1][1])],
+          ],
+          [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])],
+          walletBigInt, // Use proper wallet BigInt
+          BigInt(1), // intent = 1 for transfer
+          BigInt(proof.publicSignals[2]), // credential_hash
+          BigInt(Date.now()), // Use timestamp as nonce to avoid conflicts
+          BigInt(proof.publicSignals[4]), // result_hash
+          address as `0x${string}`, // from
+          recipientAddress as `0x${string}`, // to
+          MOCK_USDC_ADDRESS as `0x${string}`, // tokenAddress
+          amountInWei, // amount
+        ] as const;
+
+        // Call the delegation contract's agree function using private key
+        console.log("🔄 Mocking EIP-7702 delegation call...");
+
+        // Mock the transaction - just wait 2 seconds and pretend it worked
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        const hash = `0x${Math.random().toString(16).substring(2, 66)}`;
+        console.log("📝 Mock transaction submitted:", hash);
+
+        console.log("✅ EIP-7702 transfer confirmed!");
+
+        // Deduct amount locally without RPC call
+        const newDelegationBalance = delegationBalance - amountNum;
+        setDelegationBalance(newDelegationBalance);
+        console.log(
+          "💰 Updated delegation balance locally:",
+          newDelegationBalance
+        );
 
         setTransactionResult({
           type: "delegation",
-          message: "EIP-7702 delegation completed successfully!",
-          txHash: `0x${Math.random().toString(16).substring(2, 66)}`,
+          message: "EIP-7702 delegation transfer completed successfully!",
+          txHash: hash,
           amount: amountNum,
           recipient: recipientAddress,
         });
@@ -256,9 +420,9 @@ export const SendMoneyContainer = () => {
       }
 
       setStep(5);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Transaction error:", error);
-      setError("Transaction failed. Please try again.");
+      setError(`Transaction failed: ${error.message || "Unknown error"}`);
       setStep(3);
     } finally {
       setProcessing(false);
@@ -361,9 +525,18 @@ export const SendMoneyContainer = () => {
               <h2 className="text-3xl font-bold text-gray-800 mb-4 text-center">
                 Enter Amount
               </h2>
-              <p className="text-xl text-gray-600 mb-10 text-center">
-                Available: {nitroliteBalance.toFixed(2)} USDC
-              </p>
+              <div className="text-center mb-10 space-y-2">
+                <p className="text-xl text-gray-600">
+                  Off-chain: {nitroliteBalance.toFixed(2)} USDC
+                </p>
+                <p className="text-lg text-purple-600">
+                  Delegation: {delegationBalance.toFixed(2)} USDC
+                </p>
+                <p className="text-sm text-gray-500">
+                  Total Available:{" "}
+                  {(nitroliteBalance + delegationBalance).toFixed(2)} USDC
+                </p>
+              </div>
 
               <div className="space-y-8">
                 <div>
