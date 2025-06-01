@@ -7,7 +7,9 @@ const {
   createGetChannelsMessage,
   createAppSessionMessage,
   createCloseAppSessionMessage,
+  createGetLedgerBalancesMessage,
 } = require("@erc7824/nitrolite");
+const { signEip712Transaction } = require("viem/zksync");
 
 dotenv.config({ path: "../.env" });
 
@@ -203,6 +205,12 @@ async function czechoutTransfer() {
         console.log("CzechOut app session created successfully!");
         console.log(`App ID: ${session.app_session_id}`);
 
+        const signedMessage = await createGetLedgerBalancesMessage(
+          messageSigner,
+          wallet.address
+        );
+        ws.send(signedMessage);
+
         // Test closing with small amounts to see if we can transfer funds
         const closeData = [
           {
@@ -243,6 +251,12 @@ async function czechoutTransfer() {
 
         console.log("\n✅ SUCCESS: CzechOut USDC transfer completed!");
         ws.close();
+      } else if (message.res && message.res[1] === "get_ledger_balances") {
+        console.log("Received ledger balances", message.res);
+        // const balances = message[0].map((balance) => ({
+        //   asset: balance.asset,
+        //   amount: parseInt(balance.amount) / 1000000, // Convert to USDC
+        // }));
       } else if (message.res && message.res[1] === "error") {
         console.error("❌ CzechOut Error:", message.res[2][0].error);
 
