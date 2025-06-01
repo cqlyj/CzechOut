@@ -84,7 +84,7 @@ export const handleAccountChanged = (accounts: string[]) => {
 };
 
 // Contract configuration
-export const REGISTRY_ADDRESS = "0x081C0AF74DE93A30517aa9A5d9ae915d0070dFaD";
+export const REGISTRY_ADDRESS = "0x9469A68F08f692a7df72E6fE66674b4833657C96";
 
 // Contract data
 export const CONTRACT_DATA = {
