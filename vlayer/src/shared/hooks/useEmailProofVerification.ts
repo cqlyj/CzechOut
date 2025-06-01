@@ -203,7 +203,7 @@ export const useEmailProofVerification = () => {
   }, [proof]);
 
   useEffect(() => {
-    if (status === "success" && proof) {
+    if (status === "success" && proof && !isSimulating) {
       setCurrentStep(ProofVerificationStep.DONE);
       setIsSimulating(false); // Reset simulation flag on success
 
@@ -221,14 +221,22 @@ export const useEmailProofVerification = () => {
         );
       }
     }
-  }, [status, proof, isInPinRecovery, navigate, txHash]);
+  }, [status, proof, isInPinRecovery, navigate, txHash, isSimulating]);
 
-  // Also handle success for simulation mode (when using setter function directly)
+  // Handle success for simulation mode (when using setter function directly)
   useEffect(() => {
     if (status === "success" && isSimulating && txHash) {
-      setCurrentStep(ProofVerificationStep.DONE);
-      setIsSimulating(false); // Reset simulation flag
-      console.log("✅ Simulation email proof verification complete!");
+      // Wait 5 seconds after transaction success, then mark as complete
+      console.log(
+        "⏳ Transaction successful, waiting 5 seconds before completing..."
+      );
+      setTimeout(() => {
+        setCurrentStep(ProofVerificationStep.DONE);
+        setIsSimulating(false); // Reset simulation flag
+        console.log(
+          "✅ Email proof verification complete after 5 second delay!"
+        );
+      }, 8000);
     }
   }, [status, isSimulating, txHash]);
 
